@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 export const config = {
-  maxDuration: 60, // Request longer timeout from Vercel (up to 60s if allowed)
+  maxDuration: 60, 
 };
 
 // Re-defining types
@@ -36,7 +36,6 @@ export default async function handler(req: Request) {
     let systemInstruction = '';
     let prompt = '';
 
-    // OPTIMIZATION: Reduced the requested complexity to prevent 10s timeouts
     if (mode === 'market') {
       const query = data;
       prompt = query;
@@ -46,7 +45,7 @@ export default async function handler(req: Request) {
         Tool: Use Google Search to fetch REAL-TIME price and news.
 
         Structure:
-        1. **Markdown Report (Keep it concise, under 400 words):**
+        1. **Markdown Report (Keep it concise, under 300 words):**
            - **Executive Summary:** Buy/Sell/Hold verdict.
            - **Key Metrics Table:** Price, P/E, 52w High/Low.
            - **Catalysts:** What moves the stock next?
@@ -74,7 +73,6 @@ export default async function handler(req: Request) {
       `;
     } else if (mode === 'portfolio') {
       const portfolio = data as PortfolioItem[];
-      // Limit portfolio context to prevent huge prompts
       const summary = portfolio.slice(0, 10).map(p => `${p.quantity} ${p.symbol} @ $${p.buyPrice}`).join(', ');
       
       prompt = "Audit my portfolio.";
@@ -97,7 +95,9 @@ export default async function handler(req: Request) {
       contents: prompt,
       config: {
         systemInstruction: systemInstruction,
-        tools: [{ googleSearch: {} }], 
+        tools: [{ googleSearch: {} }],
+        // CRITICAL: Limit output tokens to prevent Vercel 10s timeout on free tier
+        maxOutputTokens: 1500, 
       },
     });
 
@@ -133,6 +133,6 @@ export default async function handler(req: Request) {
 
   } catch (error: any) {
     console.error("API Error:", error);
-    return new Response(JSON.stringify({ error: 'Analysis timed out or failed. Please try a more specific query.' }), { status: 500 });
+    return new Response(JSON.stringify({ error: 'Analysis timed out. Try a simpler query.' }), { status: 500 });
   }
 }
