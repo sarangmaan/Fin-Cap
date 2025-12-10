@@ -17,12 +17,12 @@ const App: React.FC = () => {
 
   // Portfolio State
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>(() => {
-    const saved = localStorage.getItem('finradar_portfolio');
+    const saved = localStorage.getItem('fincap_portfolio');
     return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
-    localStorage.setItem('finradar_portfolio', JSON.stringify(portfolioItems));
+    localStorage.setItem('fincap_portfolio', JSON.stringify(portfolioItems));
   }, [portfolioItems]);
 
   const handleUpdatePortfolio = (items: PortfolioItem[]) => {
@@ -154,7 +154,7 @@ const App: React.FC = () => {
                <div className="absolute inset-0 bg-sky-500/20 blur-lg rounded-full"></div>
                <Logo className="w-10 h-10 relative z-10" />
             </div>
-            <span className="font-bold text-xl tracking-tight text-white">Fin<span className="text-sky-400">Radar</span></span>
+            <span className="font-bold text-xl tracking-tight text-white">Fin<span className="text-sky-400">Cap</span></span>
           </div>
           <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400">
             <button onClick={() => handleNavClick('Markets')} className={`hover:text-white transition-colors cursor-pointer bg-transparent border-0 ${view === ViewState.DASHBOARD ? 'text-white font-bold' : ''}`}>Markets</button>

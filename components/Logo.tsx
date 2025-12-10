@@ -11,7 +11,7 @@ const Logo: React.FC<LogoProps> = ({ className = "w-10 h-10" }) => {
       className={className} 
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="Fin Radar Logo"
+      aria-label="Fin Cap Logo"
     >
       <defs>
         <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">

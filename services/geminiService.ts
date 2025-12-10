@@ -1,9 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { AnalysisResult, StructuredAnalysisData, PortfolioItem } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export const analyzeMarket = async (query: string): Promise<AnalysisResult> => {
+  // Initialize AI client inside the function to ensure environment is ready
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const modelId = "gemini-2.5-flash"; // Fast, supports search
 
   const systemInstruction = `
@@ -124,7 +124,6 @@ Structure your response into two distinct parts:
         if (!structuredData) {
             try {
                 // Sanitize potential trailing commas or odd whitespace which strictly breaks JSON.parse
-                // but usually models are good.
                 const potentialData = JSON.parse(group1);
                 
                 // Heuristic check to ensure this is OUR data block and not some other code snippet
@@ -154,6 +153,8 @@ Structure your response into two distinct parts:
 };
 
 export const analyzePortfolio = async (portfolio: PortfolioItem[]): Promise<AnalysisResult> => {
+  // Initialize AI client inside the function
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const modelId = "gemini-2.5-flash";
   
   const portfolioSummary = portfolio.map(p => `${p.quantity} shares of ${p.symbol} (${p.name}) bought at $${p.buyPrice}`).join(', ');
