@@ -1,11 +1,11 @@
 import { AnalysisResult, PortfolioItem } from "../types";
 
 // Helper to handle the stream fetching and parsing
-const callAnalyzeApi = async (mode: 'market' | 'portfolio', data: any, fastMode: boolean): Promise<AnalysisResult> => {
+const callAnalyzeApi = async (mode: 'market' | 'portfolio', data: any): Promise<AnalysisResult> => {
   const response = await fetch('/api/analyze', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mode, data, fastMode }),
+    body: JSON.stringify({ mode, data }),
   });
 
   if (!response.ok) {
@@ -63,49 +63,32 @@ const callAnalyzeApi = async (mode: 'market' | 'portfolio', data: any, fastMode:
       return match; 
   }).trim();
 
-  // If parsing failed but we have text, return what we have
+  // If we got text but no JSON, it might be a partial failure or just chatty model
+  // We still return the text so the user sees *something*
   return {
     markdownReport: cleanReport || "Analysis generated, but format was unexpected.",
     structuredData,
     groundingChunks: groundingChunks.map(chunk => ({
       web: chunk.web ? { uri: chunk.web.uri, title: chunk.web.title } : undefined
     })).filter(c => c.web !== undefined),
+    isEstimated: false // We are forcing real-time now
   };
 };
 
-// Simple wait helper
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
 export const analyzeMarket = async (query: string): Promise<AnalysisResult> => {
   try {
-    // Attempt 1: Full Analysis (Streaming)
-    return await callAnalyzeApi('market', query, false);
+    return await callAnalyzeApi('market', query);
   } catch (error: any) {
-    console.warn("Standard analysis failed, switching to Fast Mode...", error);
-    
-    await wait(1000);
-
-    // Attempt 2: Fast Mode (Streaming)
-    try {
-      const result = await callAnalyzeApi('market', query, true);
-      return { ...result, isEstimated: true };
-    } catch (retryError: any) {
-      throw new Error("Service is currently overloaded. Please try again later.");
-    }
+    console.error("Market Analysis Error", error);
+    throw new Error("Market analysis failed. The real-time search service might be busy. Please try again.");
   }
 };
 
 export const analyzePortfolio = async (portfolio: PortfolioItem[]): Promise<AnalysisResult> => {
   try {
-    return await callAnalyzeApi('portfolio', portfolio, false);
+    return await callAnalyzeApi('portfolio', portfolio);
   } catch (error: any) {
-    console.warn("Portfolio analysis failed, switching to Fast Mode...", error);
-    await wait(1000);
-    try {
-      const result = await callAnalyzeApi('portfolio', portfolio, true);
-      return { ...result, isEstimated: true };
-    } catch (retryError: any) {
-      throw new Error("Portfolio analysis failed. Please try with fewer assets.");
-    }
+    console.error("Portfolio Analysis Error", error);
+    throw new Error("Portfolio analysis failed. Please try again.");
   }
 };
