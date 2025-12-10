@@ -1,37 +1,18 @@
 import { GoogleGenAI } from "@google/genai";
 
-// Switch to Edge Runtime for better performance and timeout handling
 export const runtime = 'edge';
 
-// Re-defining types
-interface PortfolioItem {
-  id: string;
-  symbol: string;
-  name: string;
-  quantity: number;
-  buyPrice: number;
-  currentPrice: number;
-}
-
 export default async function POST(req: Request) {
-  // Handle preflight or wrong methods
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { 
-      status: 405,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
   }
 
   try {
-    // Parse JSON using Web Standard API (Edge compatible)
     const { mode, data, fastMode } = await req.json();
     const apiKey = process.env.API_KEY;
 
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'Server misconfigured: API Key missing.' }), { 
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return new Response(JSON.stringify({ error: 'Server misconfigured: API Key missing.' }), { status: 500 });
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -40,13 +21,13 @@ export default async function POST(req: Request) {
     let systemInstruction = '';
     let prompt = '';
     
+    // Tools logic
     const useTools = !fastMode;
-    const toolConfig = useTools ? { tools: [{ googleSearch: {} }] } : {};
+    // We strictly define tools if not in fast mode
+    const toolConfig = useTools ? { tools: [{ googleSearch: {} }] } : undefined;
 
     if (mode === 'market') {
-      const query = data;
-      prompt = query;
-      
+      prompt = data; // query
       const baseInstruction = `
         You are a Senior Financial Analyst. 
         Goal: Provide a HIGH-CONVICTION investment analysis.
@@ -84,76 +65,76 @@ export default async function POST(req: Request) {
         Tool: Use Google Search to fetch REAL-TIME price and news.`;
       } else {
         systemInstruction = `${baseInstruction}
-        CRITICAL: Real-time search is unavailable. 
-        You MUST provide plausible ESTIMATES based on your last known data.
-        In the report, explicitly mention that data is estimated/historical.
-        DO NOT fail. Generate the best possible analysis with internal knowledge.`;
+        CRITICAL: Real-time search is unavailable. Provide plausible ESTIMATES based on internal knowledge.
+        Mention data is estimated.`;
       }
 
     } else if (mode === 'portfolio') {
-      const portfolio = data as PortfolioItem[];
-      const summary = portfolio.slice(0, 10).map(p => `${p.quantity} ${p.symbol} @ $${p.buyPrice}`).join(', ');
-      
+      const portfolio = data;
+      const summary = portfolio.slice(0, 10).map((p: any) => `${p.quantity} ${p.symbol} @ $${p.buyPrice}`).join(', ');
       prompt = "Audit my portfolio.";
       systemInstruction = `
         Role: Portfolio Risk Manager.
         Portfolio: [${summary}]
-        
         Task:
-        1. Concise Markdown report on diversification and risk.
-        2. JSON block with 'riskScore' (0-100), 'bubbleProbability' and aggregated 'trendData'.
-        
-        ${!useTools ? "Real-time search unavailable. Analyze based on asset allocation fundamentals only." : ""}
-        Keep it fast.
+        1. Concise Markdown report.
+        2. JSON block with 'riskScore', 'bubbleProbability', 'trendData' (mocked index).
+        ${!useTools ? "Real-time search unavailable. Analyze based on fundamentals only." : ""}
       `;
-    } else {
-       return new Response(JSON.stringify({ error: 'Invalid mode' }), { status: 400 });
     }
 
-    const response = await ai.models.generateContent({
+    // Use generateContentStream to keep connection alive
+    const result = await ai.models.generateContentStream({
       model: modelId,
       contents: prompt,
       config: {
         systemInstruction: systemInstruction,
         ...toolConfig,
-        maxOutputTokens: 1500, 
       },
     });
 
-    const text = response.text || "";
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks as any[] || [];
+    // Create a readable stream to send chunks to the client
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        let collectedMetadata: any[] = [];
 
-    let structuredData: any | undefined;
-    const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
-    const cleanReport = text.replace(codeBlockRegex, (match, group1) => {
-        if (!structuredData) {
-            try {
-                const potentialData = JSON.parse(group1);
-                if (potentialData.riskScore !== undefined) {
-                    structuredData = potentialData;
-                    return ""; 
-                }
-            } catch (e) {}
+        try {
+          for await (const chunk of result) {
+            const text = chunk.text;
+            if (text) {
+              controller.enqueue(encoder.encode(text));
+            }
+            
+            // Collect grounding metadata if it exists in this chunk
+            const metadata = chunk.candidates?.[0]?.groundingMetadata;
+            if (metadata?.groundingChunks) {
+              collectedMetadata.push(...metadata.groundingChunks);
+            }
+          }
+
+          // At the end of the stream, append a special separator and the metadata JSON
+          // This allows the client to split the text from the metadata
+          if (collectedMetadata.length > 0) {
+             const metadataStr = JSON.stringify(collectedMetadata);
+             controller.enqueue(encoder.encode(`\n\n__FINCAP_METADATA__\n${metadataStr}`));
+          }
+        } catch (e) {
+          console.error("Streaming error", e);
+          controller.error(e);
+        } finally {
+          controller.close();
         }
-        return match; 
-    }).trim();
+      },
+    });
 
-    const result = {
-      markdownReport: cleanReport,
-      structuredData,
-      groundingChunks: groundingChunks.map(chunk => ({
-        web: chunk.web ? { uri: chunk.web.uri, title: chunk.web.title } : undefined
-      })).filter(c => c.web !== undefined),
-    };
-
-    return new Response(JSON.stringify(result), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
+    return new Response(stream, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     });
 
   } catch (error: any) {
     console.error("API Error:", error);
-    return new Response(JSON.stringify({ error: 'Analysis failed.' }), { 
+    return new Response(JSON.stringify({ error: error.message || 'Analysis failed.' }), { 
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
