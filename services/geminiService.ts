@@ -16,12 +16,20 @@ export const analyzeMarket = async (query: string): Promise<AnalysisResult> => {
       }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Market analysis failed');
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.indexOf("application/json") !== -1) {
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Market analysis failed');
+      }
+      return data;
+    } else {
+      // Handle non-JSON response (e.g., Vercel HTML error page)
+      const text = await response.text();
+      console.error("Non-JSON Response:", text);
+      throw new Error("Server error: The analysis service is currently unavailable. Please try again later.");
     }
 
-    return await response.json();
   } catch (error: any) {
     console.error("Analysis Error:", error);
     throw new Error(error.message || "Failed to analyze the market. Please check your connection.");
@@ -41,12 +49,19 @@ export const analyzePortfolio = async (portfolio: PortfolioItem[]): Promise<Anal
       }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Portfolio analysis failed');
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.indexOf("application/json") !== -1) {
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Portfolio analysis failed');
+      }
+      return data;
+    } else {
+       const text = await response.text();
+       console.error("Non-JSON Response:", text);
+       throw new Error("Server error: Portfolio analysis service is unavailable.");
     }
 
-    return await response.json();
   } catch (error: any) {
     console.error("Portfolio Error:", error);
     throw new Error(error.message || "Portfolio analysis failed.");

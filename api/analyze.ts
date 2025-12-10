@@ -10,9 +10,8 @@ interface PortfolioItem {
   currentPrice: number;
 }
 
-export const config = {
-  runtime: 'edge', // Optional: Use Edge runtime for faster cold starts
-};
+// REMOVED: export const config = { runtime: 'edge' }; 
+// Using standard Node.js runtime avoids compatibility issues with the SDK.
 
 export default async function handler(req: Request) {
   if (req.method !== 'POST') {
@@ -23,14 +22,13 @@ export default async function handler(req: Request) {
     const { mode, data } = await req.json();
     
     // Initialize AI client on the server
-    // process.env.API_KEY is secure here because this code runs on the backend
     const apiKey = process.env.API_KEY;
 
     if (!apiKey) {
       console.error("API_KEY is missing in the environment variables.");
       return new Response(
         JSON.stringify({ error: 'Server misconfigured: API Key missing.' }), 
-        { status: 500 }
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
