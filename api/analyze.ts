@@ -14,20 +14,22 @@ interface PortfolioItem {
   currentPrice: number;
 }
 
-export default async function handler(req: Request) {
+export default async function handler(req: any, res: any) {
+  // Ensure we are handling a POST request
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { mode, data, fastMode } = await req.json();
+    // Vercel/Node.js automatically parses the body for application/json content-type
+    // We add a fallback just in case it comes through as a string
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const { mode, data, fastMode } = body;
+    
     const apiKey = process.env.API_KEY;
 
     if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: 'Server misconfigured: API Key missing.' }), 
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
+      return res.status(500).json({ error: 'Server misconfigured: API Key missing.' });
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -105,7 +107,7 @@ export default async function handler(req: Request) {
         Keep it fast.
       `;
     } else {
-       return new Response(JSON.stringify({ error: 'Invalid mode' }), { status: 400 });
+       return res.status(400).json({ error: 'Invalid mode' });
     }
 
     const response = await ai.models.generateContent({
@@ -145,12 +147,10 @@ export default async function handler(req: Request) {
       })).filter(c => c.web !== undefined),
     };
 
-    return new Response(JSON.stringify(result), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return res.status(200).json(result);
 
   } catch (error: any) {
     console.error("API Error:", error);
-    return new Response(JSON.stringify({ error: 'Analysis failed.' }), { status: 500 });
+    return res.status(500).json({ error: 'Analysis failed.' });
   }
 }

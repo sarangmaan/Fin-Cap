@@ -22,6 +22,9 @@ const callAnalyzeApi = async (mode: 'market' | 'portfolio', data: any, fastMode:
   }
 };
 
+// Simple wait helper
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export const analyzeMarket = async (query: string): Promise<AnalysisResult> => {
   try {
     // Attempt 1: Full Analysis with Search (might timeout on free tier)
@@ -29,13 +32,16 @@ export const analyzeMarket = async (query: string): Promise<AnalysisResult> => {
   } catch (error: any) {
     console.warn("Standard analysis failed (likely timeout), switching to Fast Mode...");
     
+    // Short delay to let the server breathe
+    await wait(1000);
+
     // Attempt 2: Fast Mode (No Search, pure AI generation - very fast)
     try {
       const result = await callAnalyzeApi('market', query, true);
       // Mark as estimated so UI can show a warning
       return { ...result, isEstimated: true };
     } catch (retryError: any) {
-      throw new Error("The analysis service is currently overloaded. Please try again later.");
+      throw new Error("Service is currently busy. Please try a simpler query.");
     }
   }
 };
@@ -45,6 +51,7 @@ export const analyzePortfolio = async (portfolio: PortfolioItem[]): Promise<Anal
     return await callAnalyzeApi('portfolio', portfolio, false);
   } catch (error: any) {
     console.warn("Portfolio analysis failed, switching to Fast Mode...");
+    await wait(1000);
     try {
       const result = await callAnalyzeApi('portfolio', portfolio, true);
       return { ...result, isEstimated: true };
