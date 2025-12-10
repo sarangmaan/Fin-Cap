@@ -1,33 +1,26 @@
 import { AnalysisResult, PortfolioItem } from "../types";
 
-// This service now calls the secure Vercel API Route (/api/analyze)
-// It does NOT need the GoogleGenAI SDK or API_KEY on the client side.
-
 export const analyzeMarket = async (query: string): Promise<AnalysisResult> => {
   try {
     const response = await fetch('/api/analyze', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        mode: 'market',
-        data: query
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'market', data: query }),
     });
 
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.indexOf("application/json") !== -1) {
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Market analysis failed');
-      }
-      return data;
-    } else {
-      // Handle non-JSON response (e.g., Vercel HTML error page)
-      const text = await response.text();
-      console.error("Non-JSON Response:", text);
-      throw new Error("Server error: The analysis service is currently unavailable. Please try again later.");
+    // Robust handling for Vercel 504 Timeouts (which return HTML/Text)
+    const text = await response.text();
+    
+    try {
+        const data = JSON.parse(text);
+        if (!response.ok) {
+            throw new Error(data.error || 'Market analysis failed');
+        }
+        return data;
+    } catch (e) {
+        // If JSON parse fails, it means we got an HTML error page (Timeout/Crash)
+        console.error("Server Error Response:", text);
+        throw new Error("Analysis Timeout: The market analysis took too long. Please try again or use a simpler query.");
     }
 
   } catch (error: any) {
@@ -40,26 +33,21 @@ export const analyzePortfolio = async (portfolio: PortfolioItem[]): Promise<Anal
   try {
     const response = await fetch('/api/analyze', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        mode: 'portfolio',
-        data: portfolio
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'portfolio', data: portfolio }),
     });
 
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.indexOf("application/json") !== -1) {
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Portfolio analysis failed');
-      }
-      return data;
-    } else {
-       const text = await response.text();
-       console.error("Non-JSON Response:", text);
-       throw new Error("Server error: Portfolio analysis service is unavailable.");
+    const text = await response.text();
+    
+    try {
+        const data = JSON.parse(text);
+        if (!response.ok) {
+            throw new Error(data.error || 'Portfolio analysis failed');
+        }
+        return data;
+    } catch (e) {
+        console.error("Server Error Response:", text);
+        throw new Error("Analysis Timeout: Portfolio analysis took too long. Please try with fewer assets.");
     }
 
   } catch (error: any) {
