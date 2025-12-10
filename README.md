@@ -1,20 +1,35 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Fin Cap - AI Financial Analyst
 
-# Run and deploy your AI Studio app
+A comprehensive AI-powered financial analysis tool.
 
-This contains everything you need to run your app locally.
+## 🚀 Deployment on Vercel
 
-View your app in AI Studio: https://ai.studio/apps/drive/1e_FyYGjmeqZDvvlirQ_MZmelVrFoWOYP
+This application is designed to be deployed on **Vercel** to ensure the API Key remains secure.
 
-## Run Locally
+### Steps to Deploy
 
-**Prerequisites:**  Node.js
+1.  **Push to GitHub**: Commit your code and push it to a GitHub repository.
+2.  **Import to Vercel**:
+    *   Go to your [Vercel Dashboard](https://vercel.com/dashboard).
+    *   Click **Add New...** -> **Project**.
+    *   Select your GitHub repository.
+3.  **Configure Environment Variables** (The Security Step):
+    *   In the "Configure Project" screen, expand the **Environment Variables** section.
+    *   Add a new variable:
+        *   **Key**: `API_KEY`
+        *   **Value**: *(Paste your Google Gemini API Key here)*
+    *   Click **Add**.
+4.  **Deploy**: Click the **Deploy** button.
 
+### 🔒 Security Architecture
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+*   **Client-Side (React)**: The frontend (`App.tsx`) never sees the API key. It sends a request to `/api/analyze`.
+*   **Server-Side (Vercel Functions)**: The file `api/analyze.ts` runs on Vercel's secure servers. It accesses `process.env.API_KEY` to authenticate with Google, processes the data, and sends the clean result back to the frontend.
+
+## Local Development
+
+1.  Ensure you have a `.env` file in the root directory:
+    ```
+    API_KEY=your_actual_api_key_here
+    ```
+2.  Run `npm run dev`.
