@@ -1,8 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
-export const config = {
-  maxDuration: 60, 
-};
+// Switch to Edge Runtime for better performance and timeout handling
+export const runtime = 'edge';
 
 // Re-defining types
 interface PortfolioItem {
@@ -14,22 +13,25 @@ interface PortfolioItem {
   currentPrice: number;
 }
 
-export default async function handler(req: any, res: any) {
-  // Ensure we are handling a POST request
+export default async function POST(req: Request) {
+  // Handle preflight or wrong methods
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { 
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
-    // Vercel/Node.js automatically parses the body for application/json content-type
-    // We add a fallback just in case it comes through as a string
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const { mode, data, fastMode } = body;
-    
+    // Parse JSON using Web Standard API (Edge compatible)
+    const { mode, data, fastMode } = await req.json();
     const apiKey = process.env.API_KEY;
 
     if (!apiKey) {
-      return res.status(500).json({ error: 'Server misconfigured: API Key missing.' });
+      return new Response(JSON.stringify({ error: 'Server misconfigured: API Key missing.' }), { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -38,7 +40,6 @@ export default async function handler(req: any, res: any) {
     let systemInstruction = '';
     let prompt = '';
     
-    // Logic to determine if we use tools or not
     const useTools = !fastMode;
     const toolConfig = useTools ? { tools: [{ googleSearch: {} }] } : {};
 
@@ -82,7 +83,6 @@ export default async function handler(req: any, res: any) {
         systemInstruction = `${baseInstruction}
         Tool: Use Google Search to fetch REAL-TIME price and news.`;
       } else {
-         // Fast mode instruction: No tools, estimate data
         systemInstruction = `${baseInstruction}
         CRITICAL: Real-time search is unavailable. 
         You MUST provide plausible ESTIMATES based on your last known data.
@@ -101,13 +101,13 @@ export default async function handler(req: any, res: any) {
         
         Task:
         1. Concise Markdown report on diversification and risk.
-        2. JSON block with 'riskScore' (0-100), 'bubbleProbability' and aggregated 'trendData' (mocked index performance).
+        2. JSON block with 'riskScore' (0-100), 'bubbleProbability' and aggregated 'trendData'.
         
         ${!useTools ? "Real-time search unavailable. Analyze based on asset allocation fundamentals only." : ""}
         Keep it fast.
       `;
     } else {
-       return res.status(400).json({ error: 'Invalid mode' });
+       return new Response(JSON.stringify({ error: 'Invalid mode' }), { status: 400 });
     }
 
     const response = await ai.models.generateContent({
@@ -116,7 +116,6 @@ export default async function handler(req: any, res: any) {
       config: {
         systemInstruction: systemInstruction,
         ...toolConfig,
-        // Limit output tokens to prevent timeouts
         maxOutputTokens: 1500, 
       },
     });
@@ -147,10 +146,16 @@ export default async function handler(req: any, res: any) {
       })).filter(c => c.web !== undefined),
     };
 
-    return res.status(200).json(result);
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
 
   } catch (error: any) {
     console.error("API Error:", error);
-    return res.status(500).json({ error: 'Analysis failed.' });
+    return new Response(JSON.stringify({ error: 'Analysis failed.' }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
