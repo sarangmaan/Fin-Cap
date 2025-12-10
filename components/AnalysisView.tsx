@@ -25,7 +25,8 @@ import {
   Zap,
   Target,
   AlertOctagon,
-  MinusCircle
+  MinusCircle,
+  WifiOff
 } from 'lucide-react';
 
 interface AnalysisViewProps {
@@ -75,7 +76,7 @@ const SwotCard: React.FC<{ title: string; items: string[]; type: 'strength' | 'w
 };
 
 const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
-  const { markdownReport, structuredData, groundingChunks } = data;
+  const { markdownReport, structuredData, groundingChunks, isEstimated } = data;
 
   return (
     <div className="animate-fade-in pb-20">
@@ -83,10 +84,18 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
       {/* Title Section */}
       <div className="mb-8 border-b border-slate-700/50 pb-6 text-center">
          <h1 className="text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-2 drop-shadow-lg">{title}</h1>
-         <div className="text-sm text-slate-400 flex items-center justify-center gap-2 font-mono">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
-            LIVE AI ANALYSIS REPORT
-         </div>
+         
+         {!isEstimated ? (
+            <div className="text-sm text-slate-400 flex items-center justify-center gap-2 font-mono">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+                LIVE AI ANALYSIS REPORT
+            </div>
+         ) : (
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/10 border border-yellow-500/40 rounded-full text-yellow-300 text-xs font-bold uppercase tracking-wider mt-2">
+                <WifiOff className="w-4 h-4" />
+                Live Data Unavailable - Showing AI Estimates
+            </div>
+         )}
       </div>
 
       {/* Top Level Summary Cards */}
@@ -106,7 +115,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
               {structuredData.marketSentiment === 'Neutral' && <Info className="w-8 h-8" />}
               {structuredData.marketSentiment}
             </div>
-            <div className="mt-4 text-xs text-slate-500">Based on recent news & volatility</div>
+            <div className="mt-4 text-xs text-slate-500">Based on {isEstimated ? 'historical patterns' : 'recent news & volatility'}</div>
           </div>
 
           <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 flex flex-col backdrop-blur-sm">
@@ -150,8 +159,8 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
           </div>
           <MarkdownRenderer content={markdownReport} />
           
-          {/* Sources Section */}
-          {groundingChunks && groundingChunks.length > 0 && (
+          {/* Sources Section - Hide if estimated */}
+          {!isEstimated && groundingChunks && groundingChunks.length > 0 && (
              <div className="mt-12 pt-6 border-t border-slate-700">
                 <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Sources & References</h4>
                 <div className="flex flex-wrap gap-2">

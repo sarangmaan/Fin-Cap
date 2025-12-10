@@ -20,7 +20,7 @@ export default async function handler(req: Request) {
   }
 
   try {
-    const { mode, data } = await req.json();
+    const { mode, data, fastMode } = await req.json();
     const apiKey = process.env.API_KEY;
 
     if (!apiKey) {
@@ -35,15 +35,19 @@ export default async function handler(req: Request) {
 
     let systemInstruction = '';
     let prompt = '';
+    
+    // Logic to determine if we use tools or not
+    const useTools = !fastMode;
+    const toolConfig = useTools ? { tools: [{ googleSearch: {} }] } : {};
 
     if (mode === 'market') {
       const query = data;
       prompt = query;
-      systemInstruction = `
+      
+      const baseInstruction = `
         You are a Senior Financial Analyst. 
         Goal: Provide a HIGH-CONVICTION investment analysis.
-        Tool: Use Google Search to fetch REAL-TIME price and news.
-
+        
         Structure:
         1. **Markdown Report (Keep it concise, under 300 words):**
            - **Executive Summary:** Buy/Sell/Hold verdict.
@@ -71,6 +75,19 @@ export default async function handler(req: Request) {
           "swot": { "strengths": [], "weaknesses": [], "opportunities": [], "threats": [] }
         }
       `;
+
+      if (useTools) {
+        systemInstruction = `${baseInstruction}
+        Tool: Use Google Search to fetch REAL-TIME price and news.`;
+      } else {
+         // Fast mode instruction: No tools, estimate data
+        systemInstruction = `${baseInstruction}
+        CRITICAL: Real-time search is unavailable. 
+        You MUST provide plausible ESTIMATES based on your last known data.
+        In the report, explicitly mention that data is estimated/historical.
+        DO NOT fail. Generate the best possible analysis with internal knowledge.`;
+      }
+
     } else if (mode === 'portfolio') {
       const portfolio = data as PortfolioItem[];
       const summary = portfolio.slice(0, 10).map(p => `${p.quantity} ${p.symbol} @ $${p.buyPrice}`).join(', ');
@@ -84,6 +101,7 @@ export default async function handler(req: Request) {
         1. Concise Markdown report on diversification and risk.
         2. JSON block with 'riskScore' (0-100), 'bubbleProbability' and aggregated 'trendData' (mocked index performance).
         
+        ${!useTools ? "Real-time search unavailable. Analyze based on asset allocation fundamentals only." : ""}
         Keep it fast.
       `;
     } else {
@@ -95,8 +113,8 @@ export default async function handler(req: Request) {
       contents: prompt,
       config: {
         systemInstruction: systemInstruction,
-        tools: [{ googleSearch: {} }],
-        // CRITICAL: Limit output tokens to prevent Vercel 10s timeout on free tier
+        ...toolConfig,
+        // Limit output tokens to prevent timeouts
         maxOutputTokens: 1500, 
       },
     });
@@ -133,6 +151,6 @@ export default async function handler(req: Request) {
 
   } catch (error: any) {
     console.error("API Error:", error);
-    return new Response(JSON.stringify({ error: 'Analysis timed out. Try a simpler query.' }), { status: 500 });
+    return new Response(JSON.stringify({ error: 'Analysis failed.' }), { status: 500 });
   }
 }

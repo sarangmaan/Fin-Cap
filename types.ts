@@ -1,3 +1,4 @@
+
 export interface ChartDataPoint {
   label: string;
   value: number;
@@ -32,6 +33,7 @@ export interface AnalysisResult {
   markdownReport: string;
   structuredData?: StructuredAnalysisData;
   groundingChunks?: GroundingChunk[];
+  isEstimated?: boolean; // New flag to indicate fallback mode
 }
 
 export interface PortfolioItem {

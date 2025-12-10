@@ -1,57 +1,55 @@
 import { AnalysisResult, PortfolioItem } from "../types";
 
+// Helper to handle the fetch logic
+const callAnalyzeApi = async (mode: 'market' | 'portfolio', data: any, fastMode: boolean): Promise<AnalysisResult> => {
+  const response = await fetch('/api/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode, data, fastMode }),
+  });
+
+  const text = await response.text();
+  
+  try {
+      const json = JSON.parse(text);
+      if (!response.ok) {
+          throw new Error(json.error || 'Analysis failed');
+      }
+      return json;
+  } catch (e) {
+      console.error("Server Error Response:", text);
+      throw new Error("Analysis Timeout");
+  }
+};
+
 export const analyzeMarket = async (query: string): Promise<AnalysisResult> => {
   try {
-    const response = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'market', data: query }),
-    });
-
-    // Robust handling for Vercel 504 Timeouts (which return HTML/Text)
-    const text = await response.text();
-    
-    try {
-        const data = JSON.parse(text);
-        if (!response.ok) {
-            throw new Error(data.error || 'Market analysis failed');
-        }
-        return data;
-    } catch (e) {
-        // If JSON parse fails, it means we got an HTML error page (Timeout/Crash)
-        console.error("Server Error Response:", text);
-        throw new Error("Analysis Timeout: The market analysis took too long. Please try again or use a simpler query.");
-    }
-
+    // Attempt 1: Full Analysis with Search (might timeout on free tier)
+    return await callAnalyzeApi('market', query, false);
   } catch (error: any) {
-    console.error("Analysis Error:", error);
-    throw new Error(error.message || "Failed to analyze the market. Please check your connection.");
+    console.warn("Standard analysis failed (likely timeout), switching to Fast Mode...");
+    
+    // Attempt 2: Fast Mode (No Search, pure AI generation - very fast)
+    try {
+      const result = await callAnalyzeApi('market', query, true);
+      // Mark as estimated so UI can show a warning
+      return { ...result, isEstimated: true };
+    } catch (retryError: any) {
+      throw new Error("The analysis service is currently overloaded. Please try again later.");
+    }
   }
 };
 
 export const analyzePortfolio = async (portfolio: PortfolioItem[]): Promise<AnalysisResult> => {
   try {
-    const response = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'portfolio', data: portfolio }),
-    });
-
-    const text = await response.text();
-    
-    try {
-        const data = JSON.parse(text);
-        if (!response.ok) {
-            throw new Error(data.error || 'Portfolio analysis failed');
-        }
-        return data;
-    } catch (e) {
-        console.error("Server Error Response:", text);
-        throw new Error("Analysis Timeout: Portfolio analysis took too long. Please try with fewer assets.");
-    }
-
+    return await callAnalyzeApi('portfolio', portfolio, false);
   } catch (error: any) {
-    console.error("Portfolio Error:", error);
-    throw new Error(error.message || "Portfolio analysis failed.");
+    console.warn("Portfolio analysis failed, switching to Fast Mode...");
+    try {
+      const result = await callAnalyzeApi('portfolio', portfolio, true);
+      return { ...result, isEstimated: true };
+    } catch (retryError: any) {
+      throw new Error("Portfolio analysis failed. Please try with fewer assets.");
+    }
   }
 };
