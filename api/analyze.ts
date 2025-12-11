@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 export default async function handler(req, res) {
+  // 1. CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -11,6 +12,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
+    // 2. Parse Body
     let body = req.body;
     if (typeof body === 'string') {
       try { body = JSON.parse(body); } catch (e) {}
@@ -22,8 +24,10 @@ export default async function handler(req, res) {
     let prompt = "";
 
     if (marketQuery) {
+      // Market Analysis Prompt
       prompt = `
         You are a financial analyst. Provide a deep dive analysis on: "${marketQuery}".
+        
         OUTPUT FORMAT (Markdown):
         ## Market Sentiment
         (Bullish/Bearish and why)
@@ -33,6 +37,7 @@ export default async function handler(req, res) {
         (Short term forecast)
       `;
     } else if (portfolioData) {
+      // Portfolio Prompt
       prompt = `
         Analyze this portfolio: ${JSON.stringify(portfolioData)}.
         Output: Risk Score, Red Flags, and Verdict.
@@ -42,8 +47,8 @@ export default async function handler(req, res) {
     }
 
     // --- THE FIX IS HERE ---
-    // We switched from "gemini-pro" to "gemini-1.5-flash"
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // We are using the "Full Name" of the model to avoid 404 errors.
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
     
     const result = await model.generateContent(prompt);
     const response = await result.response;
