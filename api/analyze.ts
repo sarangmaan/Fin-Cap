@@ -1,7 +1,3 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-
 export default async function handler(req, res) {
   // 1. CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -21,41 +17,47 @@ export default async function handler(req, res) {
     const marketQuery = body.data || body.query;
     const portfolioData = body.portfolioData;
 
-    let prompt = "";
-
+    // 3. Construct Prompt
+    let promptText = "";
     if (marketQuery) {
-      prompt = `
-        You are a financial analyst. Provide a deep dive analysis on: "${marketQuery}".
-        OUTPUT FORMAT (Markdown):
-        ## Market Sentiment
-        (Bullish/Bearish and why)
-        ## Key Risks
-        (List 3 risks)
-        ## Outlook
-        (Short term forecast)
-      `;
+      promptText = `You are a financial analyst. Provide a deep dive analysis on: "${marketQuery}". Output: Sentiment, Risks, and Outlook.`;
     } else if (portfolioData) {
-      prompt = `
-        Analyze this portfolio: ${JSON.stringify(portfolioData)}.
-        Output: Risk Score, Red Flags, and Verdict.
-      `;
+      promptText = `Analyze this portfolio: ${JSON.stringify(portfolioData)}. Output: Risk Score, Red Flags, and Verdict.`;
     } else {
-      throw new Error("No analysis data received.");
+      return res.status(400).json({ error: "No analysis data received." });
     }
 
-    // --- FINAL FIX: GENERIC FLASH MODEL ---
-    // "gemini-1.5-flash" is the safest, most compatible tag.
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    // 4. THE MANUAL FETCH (No Library)
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("Server missing GEMINI_API_KEY");
 
-    return res.status(200).json({ analysis: text });
+    // We hit the API directly. This URL never lies.
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: promptText }]
+        }]
+      })
+    });
+
+    if (!response.ok) {
+      const errData = await response.text();
+      throw new Error(`Google API Error: ${response.status} - ${errData}`);
+    }
+
+    const data = await response.json();
+    
+    // 5. Extract Text
+    const analysisText = data.candidates?.[0]?.content?.parts?.[0]?.text || "No analysis generated.";
+
+    return res.status(200).json({ analysis: analysisText });
 
   } catch (error: any) {
-    console.error("Gemini Error:", error);
-    // This logs the exact reason if it fails again
-    return res.status(500).json({ error: error.message || "AI Analysis Failed" });
+    console.error("Analysis Error:", error);
+    return res.status(500).json({ error: error.message || "Analysis Failed" });
   }
 }
