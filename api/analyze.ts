@@ -3,7 +3,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 export default async function handler(req, res) {
-  // 1. CORS Headers (Standard)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -12,44 +11,40 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    // 2. Parse the Body
     let body = req.body;
     if (typeof body === 'string') {
       try { body = JSON.parse(body); } catch (e) {}
     }
 
-    // 3. DETECT DATA TYPE (The Fix)
-    // Scenario A: Portfolio Analysis (List of stocks)
-    const portfolioData = body.portfolioData;
-    
-    // Scenario B: Market Analysis (Single search query)
     const marketQuery = body.data || body.query;
+    const portfolioData = body.portfolioData;
 
     let prompt = "";
 
-    if (portfolioData && Array.isArray(portfolioData)) {
-      // It's a Portfolio
-      prompt = `
-        You are a financial analyst. Analyze this portfolio.
-        DATA: ${JSON.stringify(portfolioData)}
-        OUTPUT: Risk Score (0-10), 3 Red Flags, and Buy/Hold/Sell Verdict.
-      `;
-    } else if (marketQuery) {
-      // It's a Single Stock/Market Query (This is what you are doing now!)
+    if (marketQuery) {
       prompt = `
         You are a financial analyst. Provide a deep dive analysis on: "${marketQuery}".
-        OUTPUT:
-        1. Market Sentiment (Bullish/Bearish)
-        2. Key Risks
-        3. Future Outlook
-        Keep it professional and concise.
+        OUTPUT FORMAT (Markdown):
+        ## Market Sentiment
+        (Bullish/Bearish and why)
+        ## Key Risks
+        (List 3 risks)
+        ## Outlook
+        (Short term forecast)
+      `;
+    } else if (portfolioData) {
+      prompt = `
+        Analyze this portfolio: ${JSON.stringify(portfolioData)}.
+        Output: Risk Score, Red Flags, and Verdict.
       `;
     } else {
-      throw new Error("No valid data received. (Expected 'portfolioData' or 'data')");
+      throw new Error("No analysis data received.");
     }
 
-    // 4. Send to Gemini
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    // --- THE FIX IS HERE ---
+    // We switched from "gemini-pro" to "gemini-1.5-flash"
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
