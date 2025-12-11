@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  // 1. CORS Headers
+  // 1. CORS Headers (Keep the door open)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -27,12 +27,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "No analysis data received." });
     }
 
-    // 4. THE MANUAL FETCH (No Library)
+    // 4. THE FIX: Using 'gemini-2.0-flash' which IS in your list
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("Server missing GEMINI_API_KEY");
 
-    // We hit the API directly. This URL never lies.
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // Exact model name from your console log:
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -46,12 +46,11 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errData = await response.text();
-      throw new Error(`Google API Error: ${response.status} - ${errData}`);
+      console.error("Google API Error Details:", errData);
+      throw new Error(`Google API Error: ${response.status}`);
     }
 
     const data = await response.json();
-    
-    // 5. Extract Text
     const analysisText = data.candidates?.[0]?.content?.parts?.[0]?.text || "No analysis generated.";
 
     return res.status(200).json({ analysis: analysisText });
