@@ -4,14 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fin Cap - AI Market Analysis</title>
+    <link rel="icon" href="data:,">
     <script>
+      // Aggressively suppress the specific Tailwind CDN warning
       (function() {
-        const originalWarn = console.warn;
+        var oldWarn = console.warn;
         console.warn = function(...args) {
-          if (args.length > 0 && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) {
+          if (args.length > 0 && typeof args[0] === 'string' && args[0].indexOf('cdn.tailwindcss.com') !== -1) {
             return;
           }
-          originalWarn.apply(console, args);
+          oldWarn.apply(console, args);
         };
       })();
     </script>

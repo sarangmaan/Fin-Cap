@@ -28,24 +28,83 @@ const App: React.FC = () => {
   const handleUpdatePortfolio = (items: PortfolioItem[]) => {
     setPortfolioItems(items);
   };
-
-  const handleAnalyzePortfolio = async () => {
+const handleAnalyzePortfolio = async () => {
+    // 1. Validation Check
     if (portfolioItems.length === 0) return;
+    if (portfolioItems.length > 5) {
+      alert("Free Tier Limit: Please analyze 5 or fewer stocks to avoid API errors.");
+      return;
+    }
+
     setLoading(true);
     setView(ViewState.ANALYZING);
+    setError(null);
+
     try {
-      const data = await analyzePortfolio(portfolioItems);
-      setResult(data);
+      console.log("Step 1: Starting Client-Side Fetch...");
+      
+      // 2. Get the Key (Make sure you added VITE_ALPHA_VANTAGE_KEY to .env and Vercel)
+      const apiKey = import.meta.env.VITE_ALPHA_VANTAGE_KEY;
+      if (!apiKey) {
+        throw new Error("Missing API Key. Please check VITE_ALPHA_VANTAGE_KEY in your settings.");
+      }
+
+      // 3. Parallel Fetching (The "Speed Hack")
+      // We map over every stock and fetch them all at the exact same time
+      const fetchPromises = portfolioItems.map(async (item) => {
+        const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${item.symbol}&apikey=${apiKey}`;
+        
+        const res = await fetch(url);
+        const data = await res.json();
+
+        // Check for common Alpha Vantage errors
+        if (data["Note"]) throw new Error(`API Limit Reached on ${item.symbol}. Wait 1 min.`);
+        if (!data["Global Quote"] || Object.keys(data["Global Quote"]).length === 0) {
+           throw new Error(`Symbol ${item.symbol} not found.`);
+        }
+
+        // Return the clean data
+        return {
+          symbol: item.symbol,
+          quantity: item.quantity,
+          price: data["Global Quote"]["05. price"],
+          change: data["Global Quote"]["10. change percent"]
+        };
+      });
+
+      // Wait for all stocks to arrive
+      const stockData = await Promise.all(fetchPromises);
+      console.log("Step 2: Stock Data Retrieved:", stockData);
+
+      // 4. Send to Server (Only for AI Analysis)
+      console.log("Step 3: Sending data to Gemini...");
+      const aiResponse = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ portfolioData: stockData }),
+      });
+
+      if (!aiResponse.ok) {
+        const errorData = await aiResponse.json();
+        throw new Error(errorData.error || "Server Analysis Failed");
+      }
+
+      const aiResult = await aiResponse.json();
+      
+      // 5. Display Results
+      setResult(aiResult.analysis);
       setAnalyzedQuery("Portfolio Risk Audit");
       setView(ViewState.REPORT);
+
     } catch (err: any) {
+      console.error("Analysis Failed:", err);
       setError(err.message || 'Portfolio analysis failed.');
       setView(ViewState.ERROR);
     } finally {
       setLoading(false);
     }
   };
-
+  
   // Autocomplete state
   const [suggestions, setSuggestions] = useState<typeof stocks>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
