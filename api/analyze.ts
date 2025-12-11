@@ -1,3 +1,6 @@
+// VERSION CHECK: GEMINI 2.0 FLASH - DEPLOYMENT 5
+export default async function handler(req, res) {
+  // ... (keep the rest of the code I gave you) ...
 export default async function handler(req, res) {
   // 1. CORS Headers (Keep the door open)
   res.setHeader('Access-Control-Allow-Origin', '*');
