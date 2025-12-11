@@ -24,10 +24,8 @@ export default async function handler(req, res) {
     let prompt = "";
 
     if (marketQuery) {
-      // Market Analysis Prompt
       prompt = `
         You are a financial analyst. Provide a deep dive analysis on: "${marketQuery}".
-        
         OUTPUT FORMAT (Markdown):
         ## Market Sentiment
         (Bullish/Bearish and why)
@@ -37,7 +35,6 @@ export default async function handler(req, res) {
         (Short term forecast)
       `;
     } else if (portfolioData) {
-      // Portfolio Prompt
       prompt = `
         Analyze this portfolio: ${JSON.stringify(portfolioData)}.
         Output: Risk Score, Red Flags, and Verdict.
@@ -46,9 +43,9 @@ export default async function handler(req, res) {
       throw new Error("No analysis data received.");
     }
 
-    // --- THE FIX IS HERE ---
-    // We are using the "Full Name" of the model to avoid 404 errors.
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
+    // --- FINAL FIX: GENERIC FLASH MODEL ---
+    // "gemini-1.5-flash" is the safest, most compatible tag.
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     
     const result = await model.generateContent(prompt);
     const response = await result.response;
@@ -58,6 +55,7 @@ export default async function handler(req, res) {
 
   } catch (error: any) {
     console.error("Gemini Error:", error);
+    // This logs the exact reason if it fails again
     return res.status(500).json({ error: error.message || "AI Analysis Failed" });
   }
 }
