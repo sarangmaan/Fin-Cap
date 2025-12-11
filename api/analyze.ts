@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 export default async function handler(req, res) {
-  // 1. Allow CORS (Fixes connection issues)
+  // 1. CORS Headers (Essential for Vercel)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -18,25 +18,24 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 2. ROBUST DATA PARSING (The Fix)
+    // 2. Safe Data Parsing
     let body = req.body;
 
-    // If Vercel gives us a string, parse it manually
+    // Handle stringified body (common Vercel quirk)
     if (typeof body === 'string') {
       try {
         body = JSON.parse(body);
       } catch (e) {
-        console.error("Failed to parse body string:", body);
+        console.error("JSON Parse Error:", e);
       }
     }
 
     const { portfolioData } = body || {};
 
-    // 3. Debug Log (Check Vercel logs if this fails)
-    console.log("Server received data:", JSON.stringify(portfolioData).substring(0, 100) + "...");
-
+    // 3. Validation (Without the crashing log)
     if (!portfolioData || !Array.isArray(portfolioData) || portfolioData.length === 0) {
-      throw new Error("No stock data received. Please try removing and adding the stocks again.");
+      // Return a proper 400 error instead of crashing
+      return res.status(400).json({ error: "No stock data received. Please refresh and try again." });
     }
 
     // 4. Construct Prompt
