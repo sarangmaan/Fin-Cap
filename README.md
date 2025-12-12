@@ -10,7 +10,7 @@ This application is designed to be deployed on **Vercel** to ensure the API Key 
 
 1.  **Push to GitHub**: Commit your code and push it to a GitHub repository.
 2.  **Import to Vercel**:
-    *   Go to your [Vercel Dashboard](https://vercel.com/dashboard).
+    *   Go to  your [Vercel Dashboard](https://vercel.com/dashboard).
     *   Click **Add New...** -> **Project**.
     *   Select your GitHub repository.
 3.  **Configure Environment Variables** (The Security Step):
