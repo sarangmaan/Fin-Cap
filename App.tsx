@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ViewState, AnalysisResult, PortfolioItem } from './types';
-// import { analyzeMarket, analyzePortfolio } from './services/geminiService'; // REMOVED: We use the server now
 import AnalysisView from './components/AnalysisView';
 import PortfolioView from './components/PortfolioView';
 import Logo from './components/Logo';
@@ -32,57 +31,21 @@ const App: React.FC = () => {
   const handleAnalyzePortfolio = async () => {
     // 1. Validation Check
     if (portfolioItems.length === 0) return;
-    if (portfolioItems.length > 5) {
-      alert("Free Tier Limit: Please analyze 5 or fewer stocks to avoid API errors.");
-      return;
-    }
-
+    
     setLoading(true);
     setView(ViewState.ANALYZING);
     setError(null);
 
     try {
-      console.log("Step 1: Starting Client-Side Fetch...");
+      console.log("Sending portfolio to Gemini for analysis...");
       
-      // 2. Get the Key (Make sure you added VITE_ALPHA_VANTAGE_KEY to .env and Vercel/Render)
-      // Fix: Cast import.meta to any to avoid TS error and provide fallback key
-      const apiKey = (import.meta as any).env?.VITE_ALPHA_VANTAGE_KEY || '91DA6W6JSEUJ7I8E';
-      if (!apiKey) {
-        throw new Error("Missing API Key. Please check VITE_ALPHA_VANTAGE_KEY in your settings.");
-      }
-
-      // 3. Parallel Fetching (The "Speed Hack")
-      const fetchPromises = portfolioItems.map(async (item) => {
-        const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${item.symbol}&apikey=${apiKey}`;
-        
-        const res = await fetch(url);
-        const data = await res.json();
-
-        // Check for common Alpha Vantage errors
-        if (data["Note"]) throw new Error(`API Limit Reached on ${item.symbol}. Wait 1 min.`);
-        if (!data["Global Quote"] || Object.keys(data["Global Quote"]).length === 0) {
-           throw new Error(`Symbol ${item.symbol} not found.`);
-        }
-
-        // Return the clean data
-        return {
-          symbol: item.symbol,
-          quantity: item.quantity,
-          price: data["Global Quote"]["05. price"],
-          change: data["Global Quote"]["10. change percent"]
-        };
-      });
-
-      // Wait for all stocks to arrive
-      const stockData = await Promise.all(fetchPromises);
-      console.log("Step 2: Stock Data Retrieved:", stockData);
-
-      // 4. Send to Server (Only for AI Analysis)
-      console.log("Step 3: Sending data to Gemini...");
+      // DIRECT GEMINI CALL: No client-side price fetching anymore.
+      // We send the list of symbols and buy prices to the server.
+      // The server uses Gemini + Google Search to find current prices and analyze.
       const aiResponse = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ portfolioData: stockData }),
+        body: JSON.stringify({ mode: 'portfolio', data: portfolioItems }),
       });
 
       if (!aiResponse.ok) {
@@ -90,16 +53,56 @@ const App: React.FC = () => {
         throw new Error(errorData.error || "Server Analysis Failed");
       }
 
-      const aiResult = await aiResponse.json();
+      // Read the stream using the existing Service logic or simple text reading if strictly needed
+      // But since we are inside App.tsx, let's replicate the safe parsing or use a utility.
+      // For simplicity in this refactor, we will rely on the server streaming text logic.
       
-      // 5. Handle Result (THE FIX FOR CHARTS)
-      // We check if the server sent an object or a string, and parse safely.
-      let finalData = aiResult.analysis;
-      if (typeof finalData === 'string') {
-        try { finalData = JSON.parse(finalData); } catch (e) {}
+      // We need to parse the stream here to get the JSON result.
+      const reader = aiResponse.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          fullText += decoder.decode(value, { stream: true });
+        }
       }
 
-      setResult(finalData);
+      // Extract Data using same logic as geminiService
+      const parts = fullText.split('__FINCAP_METADATA__');
+      const contentText = parts[0].trim();
+      let groundingChunks: any[] = [];
+      
+      if (parts.length > 1) {
+          try { groundingChunks = JSON.parse(parts[1].trim()); } catch (e) {}
+      }
+
+      let structuredData: any | undefined;
+      const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
+      const cleanReport = contentText.replace(codeBlockRegex, (match, group1) => {
+          if (!structuredData) {
+              try {
+                  const potentialData = JSON.parse(group1);
+                  if (potentialData.riskScore !== undefined) {
+                      structuredData = potentialData;
+                      return "";
+                  }
+              } catch (e) {}
+          }
+          return match; 
+      }).trim();
+
+      setResult({
+        markdownReport: cleanReport,
+        structuredData,
+        groundingChunks: groundingChunks.map(chunk => ({
+           web: chunk.web ? { uri: chunk.web.uri, title: chunk.web.title } : undefined
+        })).filter(c => c.web !== undefined),
+        isEstimated: false
+      });
+
       setAnalyzedQuery("Portfolio Risk Audit");
       setView(ViewState.REPORT);
 
@@ -179,26 +182,60 @@ const App: React.FC = () => {
     setView(ViewState.ANALYZING);
 
     try {
-      // UPDATED: Now calls your Smart Server instead of client-side logic
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: query }), // Matches the logic in server.js
+        body: JSON.stringify({ mode: 'market', data: query }),
       });
 
       if (!response.ok) {
          throw new Error("Analysis failed. Please try again.");
       }
 
-      const resultData = await response.json();
+      // Stream Parsing Logic (Duplicated from above, could be refactored into a utility)
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
       
-      // Safety parsing for Charts
-      let finalData = resultData.analysis;
-      if (typeof finalData === 'string') {
-         try { finalData = JSON.parse(finalData); } catch(e) {}
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          fullText += decoder.decode(value, { stream: true });
+        }
       }
 
-      setResult(finalData);
+      const parts = fullText.split('__FINCAP_METADATA__');
+      const contentText = parts[0].trim();
+      let groundingChunks: any[] = [];
+      if (parts.length > 1) {
+          try { groundingChunks = JSON.parse(parts[1].trim()); } catch (e) {}
+      }
+
+      let structuredData: any | undefined;
+      const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
+      const cleanReport = contentText.replace(codeBlockRegex, (match, group1) => {
+          if (!structuredData) {
+              try {
+                  const potentialData = JSON.parse(group1);
+                  if (potentialData.riskScore !== undefined) {
+                      structuredData = potentialData;
+                      return "";
+                  }
+              } catch (e) {}
+          }
+          return match; 
+      }).trim();
+
+      setResult({
+          markdownReport: cleanReport,
+          structuredData,
+          groundingChunks: groundingChunks.map(chunk => ({
+             web: chunk.web ? { uri: chunk.web.uri, title: chunk.web.title } : undefined
+          })).filter(c => c.web !== undefined),
+          isEstimated: false
+      });
+
       setAnalyzedQuery(query);
       setView(ViewState.REPORT);
     } catch (err: any) {
@@ -257,7 +294,7 @@ const App: React.FC = () => {
                 Predict the Crash. <br/>Find the Opportunity.
               </h1>
               <p className="text-center text-white mb-8 text-lg font-medium drop-shadow-sm">
-                AI-powered financial analysis detecting overvaluation, market bubbles, and hidden risks in real-time.
+                AI-powered financial analysis detecting overvaluation, market bubbles, and hidden risks.
               </p>
            </div>
            
@@ -321,7 +358,7 @@ const App: React.FC = () => {
                 <div className="absolute inset-3 border-r-4 border-emerald-500 rounded-full animate-spin-reverse"></div>
              </div>
              <h2 className="text-2xl font-bold text-white mb-2">Analyzing Markets...</h2>
-             <p className="text-slate-400">Crunching numbers, scanning news, and detecting bubbles.</p>
+             <p className="text-slate-400">Scanning real-time data via Google Search...</p>
           </div>
         )}
 
@@ -357,7 +394,7 @@ const App: React.FC = () => {
                  ← New Analysis
                </button>
                <span className="text-xs text-slate-500 border border-slate-800 px-3 py-1 rounded-full bg-slate-900">
-                  Data sourced via Gemini & Google Search
+                  Powered by Gemini 2.5 & Google Search
                </span>
             </div>
             <AnalysisView data={result} title={analyzedQuery} />
