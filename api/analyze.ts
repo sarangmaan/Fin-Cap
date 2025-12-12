@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  // 1. CORS Headers (Keep the door open)
+  // 1. CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    // 2. Parse Body (Handle Vercel's data quirks)
+    // 2. Parse Body
     let body = req.body;
     if (typeof body === 'string') {
       try { body = JSON.parse(body); } catch (e) {}
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     const marketQuery = body.data || body.query;
     const portfolioData = body.portfolioData;
 
-    // 3. Construct the Prompt
+    // 3. Construct Prompt
     let promptText = "";
     if (marketQuery) {
       promptText = `You are a financial analyst. Provide a deep dive analysis on: "${marketQuery}". Output: Sentiment, Risks, and Outlook.`;
@@ -26,9 +26,11 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "No analysis data received." });
     }
 
-    // 4. THE AI CALL (Using your available model: gemini-2.0-flash)
+    // 4. THE SWITCH: Using 'gemini-2.0-flash-lite' (Better for Free Tier limits)
     const apiKey = process.env.GEMINI_API_KEY;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    
+    // We use the EXACT version from your available model list:
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -41,6 +43,10 @@ export default async function handler(req, res) {
     });
 
     if (!response.ok) {
+      // 5. Handle Rate Limits (429) Gracefully
+      if (response.status === 429) {
+        throw new Error("High Traffic: Free tier limit reached. Please wait 1 minute.");
+      }
       const errData = await response.text();
       throw new Error(`Google API Error: ${response.status} - ${errData}`);
     }
@@ -48,7 +54,6 @@ export default async function handler(req, res) {
     const data = await response.json();
     const analysisText = data.candidates?.[0]?.content?.parts?.[0]?.text || "No analysis generated.";
 
-    // 5. Success
     return res.status(200).json({ analysis: analysisText });
 
   } catch (error: any) {
