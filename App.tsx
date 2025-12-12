@@ -45,7 +45,8 @@ const App: React.FC = () => {
       console.log("Step 1: Starting Client-Side Fetch...");
       
       // 2. Get the Key (Make sure you added VITE_ALPHA_VANTAGE_KEY to .env and Vercel/Render)
-      const apiKey = import.meta.env.VITE_ALPHA_VANTAGE_KEY;
+      // Fix: Cast import.meta to any to avoid TS error and provide fallback key
+      const apiKey = (import.meta as any).env?.VITE_ALPHA_VANTAGE_KEY || '91DA6W6JSEUJ7I8E';
       if (!apiKey) {
         throw new Error("Missing API Key. Please check VITE_ALPHA_VANTAGE_KEY in your settings.");
       }
