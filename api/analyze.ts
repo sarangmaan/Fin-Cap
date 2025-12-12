@@ -26,11 +26,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "No analysis data received." });
     }
 
-    // 4. THE SWITCH: Using 'gemini-2.0-flash-lite' (Better for Free Tier limits)
+    // 4. THE STABLE MODEL: 'gemini-flash-latest'
+    // This maps to 1.5 Flash. It has the best free tier limits (15 RPM).
     const apiKey = process.env.GEMINI_API_KEY;
-    
-    // We use the EXACT version from your available model list:
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -43,9 +42,8 @@ export default async function handler(req, res) {
     });
 
     if (!response.ok) {
-      // 5. Handle Rate Limits (429) Gracefully
       if (response.status === 429) {
-        throw new Error("High Traffic: Free tier limit reached. Please wait 1 minute.");
+        throw new Error("Rate Limit Exceeded. (Note: New keys can take 5 mins to activate fully).");
       }
       const errData = await response.text();
       throw new Error(`Google API Error: ${response.status} - ${errData}`);
