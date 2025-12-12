@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ViewState, AnalysisResult, PortfolioItem } from './types';
-import { analyzeMarket, analyzePortfolio } from './services/geminiService';
+// import { analyzeMarket, analyzePortfolio } from './services/geminiService'; // REMOVED: We use the server now
 import AnalysisView from './components/AnalysisView';
 import PortfolioView from './components/PortfolioView';
 import Logo from './components/Logo';
@@ -28,7 +28,8 @@ const App: React.FC = () => {
   const handleUpdatePortfolio = (items: PortfolioItem[]) => {
     setPortfolioItems(items);
   };
-const handleAnalyzePortfolio = async () => {
+
+  const handleAnalyzePortfolio = async () => {
     // 1. Validation Check
     if (portfolioItems.length === 0) return;
     if (portfolioItems.length > 5) {
@@ -43,14 +44,13 @@ const handleAnalyzePortfolio = async () => {
     try {
       console.log("Step 1: Starting Client-Side Fetch...");
       
-      // 2. Get the Key (Make sure you added VITE_ALPHA_VANTAGE_KEY to .env and Vercel)
+      // 2. Get the Key (Make sure you added VITE_ALPHA_VANTAGE_KEY to .env and Vercel/Render)
       const apiKey = import.meta.env.VITE_ALPHA_VANTAGE_KEY;
       if (!apiKey) {
         throw new Error("Missing API Key. Please check VITE_ALPHA_VANTAGE_KEY in your settings.");
       }
 
       // 3. Parallel Fetching (The "Speed Hack")
-      // We map over every stock and fetch them all at the exact same time
       const fetchPromises = portfolioItems.map(async (item) => {
         const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${item.symbol}&apikey=${apiKey}`;
         
@@ -91,8 +91,14 @@ const handleAnalyzePortfolio = async () => {
 
       const aiResult = await aiResponse.json();
       
-      // 5. Display Results
-      setResult(aiResult.analysis);
+      // 5. Handle Result (THE FIX FOR CHARTS)
+      // We check if the server sent an object or a string, and parse safely.
+      let finalData = aiResult.analysis;
+      if (typeof finalData === 'string') {
+        try { finalData = JSON.parse(finalData); } catch (e) {}
+      }
+
+      setResult(finalData);
       setAnalyzedQuery("Portfolio Risk Audit");
       setView(ViewState.REPORT);
 
@@ -172,8 +178,26 @@ const handleAnalyzePortfolio = async () => {
     setView(ViewState.ANALYZING);
 
     try {
-      const data = await analyzeMarket(query);
-      setResult(data);
+      // UPDATED: Now calls your Smart Server instead of client-side logic
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: query }), // Matches the logic in server.js
+      });
+
+      if (!response.ok) {
+         throw new Error("Analysis failed. Please try again.");
+      }
+
+      const resultData = await response.json();
+      
+      // Safety parsing for Charts
+      let finalData = resultData.analysis;
+      if (typeof finalData === 'string') {
+         try { finalData = JSON.parse(finalData); } catch(e) {}
+      }
+
+      setResult(finalData);
       setAnalyzedQuery(query);
       setView(ViewState.REPORT);
     } catch (err: any) {
@@ -240,18 +264,18 @@ const handleAnalyzePortfolio = async () => {
              <div className="absolute -inset-0.5 bg-gradient-to-r from-sky-500 to-emerald-500 rounded-xl blur opacity-30 group-hover:opacity-60 transition duration-1000"></div>
              <form onSubmit={handleSearch} className="relative flex">
                <input 
-                  type="text" 
-                  value={query}
-                  onChange={handleInputChange}
-                  onFocus={() => { if(query.length > 0) setShowSuggestions(true); }}
-                  placeholder="Analyze a stock (e.g., TSLA), sector (e.g., AI), or market..."
-                  className="w-full bg-[#1e293b] text-white placeholder-slate-400 border border-slate-700 rounded-xl py-4 pl-6 pr-14 focus:outline-none focus:ring-2 focus:ring-sky-500/50 shadow-2xl text-lg transition-all"
-                  disabled={loading}
+                 type="text" 
+                 value={query}
+                 onChange={handleInputChange}
+                 onFocus={() => { if(query.length > 0) setShowSuggestions(true); }}
+                 placeholder="Analyze a stock (e.g., TSLA), sector (e.g., AI), or market..."
+                 className="w-full bg-[#1e293b] text-white placeholder-slate-400 border border-slate-700 rounded-xl py-4 pl-6 pr-14 focus:outline-none focus:ring-2 focus:ring-sky-500/50 shadow-2xl text-lg transition-all"
+                 disabled={loading}
                />
                <button 
-                  type="submit"
-                  disabled={loading}
-                  className="absolute right-2 top-2 bottom-2 bg-sky-600 hover:bg-sky-500 text-white p-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                 type="submit"
+                 disabled={loading}
+                 className="absolute right-2 top-2 bottom-2 bg-sky-600 hover:bg-sky-500 text-white p-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                >
                   <Search className="w-6 h-6" />
                </button>
