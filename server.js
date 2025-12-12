@@ -1,26 +1,24 @@
 import express from 'express';
 import cors from 'cors';
-import fetch from 'node-fetch'; // You might need to add this to package.json if missing
+import fetch from 'node-fetch';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const app = express();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// 1. Middleware
+// Middleware
 app.use(cors());
 app.use(express.json());
-
-// 2. Serve the Frontend (The "dist" folder that Vite builds)
 app.use(express.static(join(__dirname, 'dist')));
 
-// 3. THE SMART API ROUTE (Your AI Logic)
+// API Route
 app.post('/api/analyze', async (req, res) => {
   try {
     const { portfolioData, data: marketQuery } = req.body;
     let promptText = "";
 
-    // Construct Prompt (Asking for JSON to restore Charts)
+    // Construct Prompt (Asking for JSON)
     if (marketQuery) {
       promptText = `
         You are a financial analyst. Analyze: "${marketQuery}".
@@ -29,7 +27,7 @@ app.post('/api/analyze', async (req, res) => {
           "sentiment": "Bullish" or "Bearish",
           "riskScore": (number 0-100),
           "summary": "Brief analysis string...",
-          "redFlags": ["flag1", "flag2", "flag3"],
+          "redFlags": ["flag1", "flag2"],
           "outlook": "Positive" or "Negative"
         }
       `;
@@ -48,7 +46,7 @@ app.post('/api/analyze', async (req, res) => {
       return res.status(400).json({ error: "No data received." });
     }
 
-    // Call Gemini (Using Flash-Latest)
+    // Call Gemini
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("Missing GEMINI_API_KEY");
     
@@ -60,15 +58,12 @@ app.post('/api/analyze', async (req, res) => {
       body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
     });
 
-    if (!response.ok) {
-       if (response.status === 429) throw new Error("Free Quota Limit. Please wait.");
-       throw new Error(`Google API Error: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`Google API Error: ${response.status}`);
 
     const data = await response.json();
     let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-
-    // Clean & Parse JSON
+    
+    // Clean JSON
     rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
     const analysisJson = JSON.parse(rawText);
 
@@ -76,24 +71,23 @@ app.post('/api/analyze', async (req, res) => {
 
   } catch (error) {
     console.error("Server Error:", error);
-    // Return safe fallback so app doesn't crash
+    // Safe fallback
     res.status(200).json({ 
       analysis: {
         riskScore: 50,
         sentiment: "Neutral",
-        summary: "Analysis unavailable (" + error.message + ")",
-        redFlags: ["Server Error"],
+        summary: "Analysis unavailable momentarily.",
+        redFlags: ["System Busy"],
         outlook: "Neutral"
       }
     });
   }
 });
 
-// 4. Handle React Routing (Redirect any other request to index.html)
+// Handle React Routing
 app.get('*', (req, res) => {
   res.sendFile(join(__dirname, 'dist', 'index.html'));
 });
 
-// 5. Start the Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
