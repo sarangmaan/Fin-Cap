@@ -1,15 +1,16 @@
 import { AnalysisResult, PortfolioItem } from "../types";
 import { GoogleGenAI } from "@google/genai";
 
-// Initialize Gemini SDK with the API Key injected by Vite
+// Try to get the key from process.env (injected by Vite define)
 const apiKey = process.env.API_KEY;
+
 if (!apiKey) {
-  console.error("API_KEY is missing. Please check your .env file.");
+  console.error("API_KEY is missing. Please add API_KEY to your Render Environment Variables.");
 }
-const ai = new GoogleGenAI({ apiKey: apiKey || '' });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const analyzeMarket = async (query: string): Promise<AnalysisResult> => {
-  if (!apiKey) throw new Error("API Key is missing. Check .env configuration.");
+  if (!apiKey) throw new Error("API Key is missing. Please add 'API_KEY' to your Render Environment Variables and Redeploy.");
 
   const prompt = `
     Perform a financial analysis for: "${query}".
@@ -54,7 +55,7 @@ export const analyzeMarket = async (query: string): Promise<AnalysisResult> => {
 };
 
 export const analyzePortfolio = async (portfolio: PortfolioItem[]): Promise<AnalysisResult> => {
-  if (!apiKey) throw new Error("API Key is missing. Check .env configuration.");
+  if (!apiKey) throw new Error("API Key is missing. Please add 'API_KEY' to your Render Environment Variables and Redeploy.");
 
   const summary = portfolio.map(p => `${p.quantity} shares of ${p.symbol} (Bought @ $${p.buyPrice})`).join(', ');
   
