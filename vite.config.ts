@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       host: true, // Listen on all addresses
+      allowedHosts: true, // Allow the Render URL to access the server
     },
   };
 });
