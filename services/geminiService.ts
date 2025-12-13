@@ -15,9 +15,18 @@ export const analyzeMarket = async (query: string): Promise<AnalysisResult> => {
   const prompt = `
     Perform a financial analysis for: "${query}".
     
-    1. SEARCH for the CURRENT STOCK PRICE, today's change, and recent news.
-    2. SEARCH for P/E ratio, Market Cap, and recent analyst ratings.
-    3. Analyze the data.
+    TASK:
+    1. If the query is a specific PUBLIC COMPANY (e.g., Apple, TSLA):
+       - SEARCH for Real-Time Price, Today's Change %, Market Cap, and P/E Ratio.
+       - SEARCH for recent analyst upgrades/downgrades and major news.
+       
+    2. If the query is a SECTOR, MARKET, or ECONOMIC TOPIC (e.g., "AI Bubble", "Housing Market", "Crypto"):
+       - SEARCH for major indices performance (e.g., Nasdaq AI index, Case-Shiller).
+       - SEARCH for macro indicators, recent news, and sentiment reports.
+    
+    3. Analyze the gathered data to determine risks and opportunities.
+    
+    4. ESTIMATE recent price action to generate a trend chart (trendData) if exact historical CSV data is unavailable.
   `;
   
   const systemInstruction = `
@@ -28,12 +37,12 @@ export const analyzeMarket = async (query: string): Promise<AnalysisResult> => {
     
     **REPORT STRUCTURE (Markdown)**:
     1. **Executive Summary**: 
-        - Current Price & Ticker (Bold)
-        - Immediate Verdict (BUY / SELL / HOLD / CAUTION)
+        - Current Status/Price (Bold)
+        - Immediate Verdict (BUY / SELL / HOLD / CAUTION / OBSERVING)
     2. **Real-Time Catalysts**:
-        - What is moving the stock *today*?
+        - What is moving the asset/market *today*?
     3. **Valuation & Risk**:
-        - Is it overvalued?
+        - Is it overvalued? What are the bubble risks?
     4. **Final Verdict**:
         - Format strictly as: [[[BUY]]] or [[[SELL]]] or [[[HOLD]]] or [[[CAUTION]]]
 
@@ -45,7 +54,14 @@ export const analyzeMarket = async (query: string): Promise<AnalysisResult> => {
       "bubbleProbability": number (0-100),
       "marketSentiment": "Bullish" | "Bearish" | "Neutral",
       "keyMetrics": [ { "label": "Price", "value": "$..." } ],
-      "trendData": [ { "label": "Now", "value": 100 } ], 
+      "trendData": [ 
+        // MANDATORY: Generate exactly 15 data points representing the last 30 days of price action.
+        // Label format: "MM-DD". Value: Price. ma50: 50-day Moving Avg. rsi: RSI (0-100).
+        // If exact historical data is not found, SYNTHESIZE a realistic trend based on the current price and volatility.
+        // DO NOT return a single point. The chart needs a line.
+        { "label": "01-01", "value": 145.20, "ma50": 142.50, "rsi": 55 },
+        { "label": "01-02", "value": 147.10, "ma50": 143.00, "rsi": 58 }
+      ], 
       "warningSignals": [ "Signal 1" ],
       "swot": { "strengths": [], "weaknesses": [], "opportunities": [], "threats": [] }
     }
@@ -69,7 +85,7 @@ export const analyzePortfolio = async (portfolio: PortfolioItem[]): Promise<Anal
     Role: Hedge Fund Risk Manager.
     Output:
     1. Markdown Report (Assessment, Diversification Check, Actionable Advice).
-    2. JSON Data Block (same schema as market analysis).
+    2. JSON Data Block (same schema as market analysis, including 'trendData' for the overall portfolio value over time).
   `;
 
   return await executeGeminiRequest(prompt, systemInstruction);
