@@ -1,3 +1,5 @@
+import { GoogleGenAI } from '@google/genai';
+
 export default async function handler(req, res) {
   // 1. CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -13,77 +15,59 @@ export default async function handler(req, res) {
       try { body = JSON.parse(body); } catch (e) {}
     }
 
-    const marketQuery = body.data || body.query;
-    const portfolioData = body.portfolioData;
+    const { mode, data } = body;
+    const apiKey = process.env.API_KEY;
 
-    // 3. Construct Prompt (Demanding JSON for Charts)
-    let promptText = "";
-    if (marketQuery) {
-      promptText = `
-        You are a financial analyst. Analyze: "${marketQuery}".
-        Return valid JSON (NO markdown) with these exact keys:
-        {
-          "sentiment": "Bullish" or "Bearish",
-          "riskScore": (number 0-100),
-          "summary": "Brief analysis string...",
-          "redFlags": ["flag1", "flag2"],
-          "outlook": "Positive" or "Negative"
-        }
+    if (!apiKey) {
+      return res.status(500).json({ error: 'Server Config Error: API_KEY is missing.' });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const modelId = "gemini-2.5-flash"; 
+
+    // Reconstruct prompts consistent with server.js
+    let systemInstruction = '';
+    let prompt = '';
+
+    if (mode === 'market') {
+      prompt = `Analyze: "${data}". Search for current price, news, and valuation.`;
+      systemInstruction = `
+        Role: Financial Analyst.
+        Objective: Use Google Search to get real-time data.
+        Output: Markdown Report + JSON Block (riskScore, riskLevel, bubbleProbability, marketSentiment, keyMetrics, trendData, warningSignals, swot).
+        Structure: Executive Summary (Verdict), Catalysts, Valuation.
       `;
-    } else if (portfolioData) {
-      promptText = `
-        Analyze this portfolio: ${JSON.stringify(portfolioData)}.
-        Return valid JSON (NO markdown) with these exact keys:
-        {
-          "riskScore": (number 0-100),
-          "verdict": "Buy" or "Hold" or "Sell",
-          "summary": "Brief analysis string...",
-          "redFlags": ["flag1", "flag2"]
-        }
+    } else if (mode === 'portfolio') {
+      prompt = `Audit portfolio: ${JSON.stringify(data)}. Search for current prices.`;
+      systemInstruction = `
+        Role: Risk Manager.
+        Output: Markdown Report + JSON Block.
       `;
     } else {
-      return res.status(400).json({ error: "No data received." });
+        return res.status(400).json({ error: "Invalid request mode" });
     }
 
-    // 4. Call Gemini (Using 'gemini-flash-latest' for best free limits)
-    const apiKey = process.env.GEMINI_API_KEY;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: promptText }] }]
-      })
-    });
-
-    if (!response.ok) {
-       // Graceful fallback if limits hit
-       if (response.status === 429) throw new Error("Free Quota Limit. Please wait 30s.");
-       const err = await response.text();
-       throw new Error(`Google API Error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-
-    // 5. Clean & Parse JSON (Fixes the "Text instead of Charts" bug)
-    rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-    const analysisJson = JSON.parse(rawText);
-
-    return res.status(200).json({ analysis: analysisJson });
-
-  } catch (error: any) {
-    console.error("Server Error:", error);
-    // Return a "Safe" JSON object so the app doesn't crash
-    return res.status(200).json({ 
-      analysis: {
-        riskScore: 50,
-        sentiment: "Neutral",
-        summary: "Analysis unavailable momentarily (" + error.message + ")",
-        redFlags: ["System Busy"],
-        outlook: "Neutral"
+    // Use standard generateContent (non-streaming for Vercel Serverless simplicity, or stream if supported)
+    // We will use generateContent for simplicity in serverless environment to avoid stream timeouts/complexity
+    const response = await ai.models.generateContent({
+      model: modelId,
+      contents: prompt,
+      config: {
+        systemInstruction: systemInstruction,
+        tools: [{ googleSearch: {} }],
       }
     });
+
+    const text = response.text || "";
+    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    
+    // Format to match the client's expected stream format (Mocking the stream format for compatibility)
+    const output = `${text}\n\n__FINCAP_METADATA__\n${JSON.stringify(chunks)}`;
+
+    return res.status(200).send(output);
+
+  } catch (error: any) {
+    console.error("Vercel Server Error:", error);
+    return res.status(500).json({ error: error.message || 'Server Internal Error' });
   }
 }

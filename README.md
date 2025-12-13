@@ -1,35 +1,45 @@
 # Fin Cap - AI Financial Analyst
 
-A comprehensive AI-powered financial analysis tool.
+A comprehensive AI-powered financial analysis tool that detects market bubbles, provides detailed company reports, and offers early warning risk assessments.
 
-## 🚀 Deployment on Vercel
+## 🔑 Getting Started
 
-This application is designed to be deployed on **Vercel** to ensure the API Key remains secure.
+### 1. API Key Setup (Required)
+You **must** set up your Google Gemini API key as an environment variable. **Do not** put your API key in the source code.
 
-### Steps to Deploy
-
-1.  **Push to GitHub**: Commit your code and push it to a GitHub repository.
-2.  **Import to Vercel**:
-    *   Go to  your [Vercel Dashboard](https://vercel.com/dashboard).
-    *   Click **Add New...** -> **Project**.
-    *   Select your GitHub repository.
-3.  **Configure Environment Variables** (The Security Step):
-    *   In the "Configure Project" screen, expand the **Environment Variables** section.
-    *   Add a new variable:
-        *   **Key**: `API_KEY`
-        *   **Value**: *(Paste your Google Gemini API Key here)*
-    *   Click **Add**.
-4.  **Deploy**: Click the **Deploy** button.
-
-### 🔒 Security Architecture
-
-*   **Client-Side (React)**: The frontend (`App.tsx`) never sees the API key. It sends a request to `/api/analyze`.
-*   **Server-Side (Vercel Functions)**: The file `api/analyze.ts` runs on Vercel's secure servers. It accesses `process.env.API_KEY` to authenticate with Google, processes the data, and sends the clean result back to the frontend.
-
-## Local Development
-
-1.  Ensure you have a `.env` file in the root directory:
+1.  Create a file named `.env` in the root directory of this project.
+2.  Add your API key to the file:
     ```
     API_KEY=your_actual_api_key_here
     ```
-2.  Run `npm run dev`.
+
+### 2. Running the Application
+This app has two parts: a React frontend and a Node.js backend (to securely proxy API requests).
+
+**Option A: Development Mode**
+You need two terminals:
+
+1.  **Terminal 1 (Backend):**
+    ```bash
+    npm install
+    node server.js
+    ```
+    *This runs the API proxy on http://localhost:3000*
+
+2.  **Terminal 2 (Frontend):**
+    ```bash
+    npm run dev
+    ```
+    *This runs the UI on http://localhost:5173*
+
+**Option B: Production / Deployment**
+Deploy to a host like Vercel or Render. Ensure you set the `API_KEY` environment variable in your hosting provider's dashboard.
+
+## 🚀 Features
+*   **Market Analysis**: Deep dives into stocks, crypto, and indices using real-time Google Search data.
+*   **Portfolio Tracker**: Manual portfolio entry with AI risk auditing.
+*   **Bubble Scope**: Dedicated mode to detect overvalued sectors and crash risks.
+*   **Visual Reports**: Markdown reports, risk gauges, and interactive charts.
+
+## 🔒 Security Note
+The frontend never sees your API key. It is stored securely on the server (or serverless function) via `process.env.API_KEY`.

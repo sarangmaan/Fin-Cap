@@ -3,8 +3,9 @@ import { ViewState, AnalysisResult, PortfolioItem } from './types';
 import AnalysisView from './components/AnalysisView';
 import PortfolioView from './components/PortfolioView';
 import Logo from './components/Logo';
-import { Search, BarChart3, AlertTriangle, TrendingUp, DollarSign, PieChart } from 'lucide-react';
+import { Search, BarChart3, AlertTriangle, TrendingUp, DollarSign, PieChart, Activity } from 'lucide-react';
 import { stocks } from './data/stocks';
+import { analyzeMarket, analyzePortfolio } from './services/geminiService';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(ViewState.DASHBOARD);
@@ -28,6 +29,29 @@ const App: React.FC = () => {
     setPortfolioItems(items);
   };
 
+  const performAnalysis = async (searchQuery: string) => {
+    if (!searchQuery.trim()) return;
+
+    setShowSuggestions(false);
+    setLoading(true);
+    setError(null);
+    setView(ViewState.ANALYZING);
+
+    try {
+      const result = await analyzeMarket(searchQuery);
+
+      setResult(result);
+      setAnalyzedQuery(searchQuery);
+      setView(ViewState.REPORT);
+    } catch (err: any) {
+      console.error("Search Analysis Failed:", err);
+      setError(err.message || 'Something went wrong.');
+      setView(ViewState.ERROR);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAnalyzePortfolio = async () => {
     // 1. Validation Check
     if (portfolioItems.length === 0) return;
@@ -39,70 +63,9 @@ const App: React.FC = () => {
     try {
       console.log("Sending portfolio to Gemini for analysis...");
       
-      // DIRECT GEMINI CALL: No client-side price fetching anymore.
-      // We send the list of symbols and buy prices to the server.
-      // The server uses Gemini + Google Search to find current prices and analyze.
-      const aiResponse = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'portfolio', data: portfolioItems }),
-      });
+      const result = await analyzePortfolio(portfolioItems);
 
-      if (!aiResponse.ok) {
-        const errorData = await aiResponse.json();
-        throw new Error(errorData.error || "Server Analysis Failed");
-      }
-
-      // Read the stream using the existing Service logic or simple text reading if strictly needed
-      // But since we are inside App.tsx, let's replicate the safe parsing or use a utility.
-      // For simplicity in this refactor, we will rely on the server streaming text logic.
-      
-      // We need to parse the stream here to get the JSON result.
-      const reader = aiResponse.body?.getReader();
-      const decoder = new TextDecoder();
-      let fullText = '';
-      
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          fullText += decoder.decode(value, { stream: true });
-        }
-      }
-
-      // Extract Data using same logic as geminiService
-      const parts = fullText.split('__FINCAP_METADATA__');
-      const contentText = parts[0].trim();
-      let groundingChunks: any[] = [];
-      
-      if (parts.length > 1) {
-          try { groundingChunks = JSON.parse(parts[1].trim()); } catch (e) {}
-      }
-
-      let structuredData: any | undefined;
-      const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
-      const cleanReport = contentText.replace(codeBlockRegex, (match, group1) => {
-          if (!structuredData) {
-              try {
-                  const potentialData = JSON.parse(group1);
-                  if (potentialData.riskScore !== undefined) {
-                      structuredData = potentialData;
-                      return "";
-                  }
-              } catch (e) {}
-          }
-          return match; 
-      }).trim();
-
-      setResult({
-        markdownReport: cleanReport,
-        structuredData,
-        groundingChunks: groundingChunks.map(chunk => ({
-           web: chunk.web ? { uri: chunk.web.uri, title: chunk.web.title } : undefined
-        })).filter(c => c.web !== undefined),
-        isEstimated: false
-      });
-
+      setResult(result);
       setAnalyzedQuery("Portfolio Risk Audit");
       setView(ViewState.REPORT);
 
@@ -168,82 +131,14 @@ const App: React.FC = () => {
   };
 
   const handleSelectSuggestion = (stock: typeof stocks[0]) => {
-    setQuery(`${stock.symbol} - ${stock.name}`);
+    const newQuery = `${stock.symbol} - ${stock.name}`;
+    setQuery(newQuery);
     setShowSuggestions(false);
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
-
-    setShowSuggestions(false);
-    setLoading(true);
-    setError(null);
-    setView(ViewState.ANALYZING);
-
-    try {
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'market', data: query }),
-      });
-
-      if (!response.ok) {
-         throw new Error("Analysis failed. Please try again.");
-      }
-
-      // Stream Parsing Logic (Duplicated from above, could be refactored into a utility)
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let fullText = '';
-      
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          fullText += decoder.decode(value, { stream: true });
-        }
-      }
-
-      const parts = fullText.split('__FINCAP_METADATA__');
-      const contentText = parts[0].trim();
-      let groundingChunks: any[] = [];
-      if (parts.length > 1) {
-          try { groundingChunks = JSON.parse(parts[1].trim()); } catch (e) {}
-      }
-
-      let structuredData: any | undefined;
-      const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
-      const cleanReport = contentText.replace(codeBlockRegex, (match, group1) => {
-          if (!structuredData) {
-              try {
-                  const potentialData = JSON.parse(group1);
-                  if (potentialData.riskScore !== undefined) {
-                      structuredData = potentialData;
-                      return "";
-                  }
-              } catch (e) {}
-          }
-          return match; 
-      }).trim();
-
-      setResult({
-          markdownReport: cleanReport,
-          structuredData,
-          groundingChunks: groundingChunks.map(chunk => ({
-             web: chunk.web ? { uri: chunk.web.uri, title: chunk.web.title } : undefined
-          })).filter(c => c.web !== undefined),
-          isEstimated: false
-      });
-
-      setAnalyzedQuery(query);
-      setView(ViewState.REPORT);
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong.');
-      setView(ViewState.ERROR);
-    } finally {
-      setLoading(false);
-    }
+    performAnalysis(query);
   };
 
   const handleRetry = () => {
@@ -257,9 +152,10 @@ const App: React.FC = () => {
           setView(ViewState.PORTFOLIO);
       } else if (viewName === 'Markets') {
           setView(ViewState.DASHBOARD);
-      } else {
-          // Placeholder for non-implemented features
-          console.log(`${viewName} clicked`);
+      } else if (viewName === 'Bubble Scope') {
+          const bubbleQuery = "Analyze global market bubbles, overvalued sectors, and crash risks for the current year.";
+          setQuery(bubbleQuery);
+          performAnalysis(bubbleQuery);
       }
   };
 
@@ -280,7 +176,9 @@ const App: React.FC = () => {
           <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400">
             <button onClick={() => handleNavClick('Markets')} className={`hover:text-white transition-colors cursor-pointer bg-transparent border-0 ${view === ViewState.DASHBOARD ? 'text-white font-bold' : ''}`}>Markets</button>
             <button onClick={() => handleNavClick('Portfolio')} className={`hover:text-white transition-colors cursor-pointer bg-transparent border-0 ${view === ViewState.PORTFOLIO ? 'text-white font-bold' : ''}`}>Portfolio Tracker</button>
-            <button onClick={() => handleNavClick('Screener')} className="hover:text-white transition-colors cursor-pointer bg-transparent border-0">Screener</button>
+            <button onClick={() => handleNavClick('Bubble Scope')} className="hover:text-rose-400 text-slate-400 transition-colors cursor-pointer bg-transparent border-0 flex items-center gap-1">
+               <Activity className="w-4 h-4" /> Bubble Scope
+            </button>
           </div>
         </div>
       </nav>
@@ -343,9 +241,9 @@ const App: React.FC = () => {
              )}
 
              <div className="flex justify-center gap-4 mt-4 text-xs text-slate-500">
-                <span className="px-2 py-1 bg-slate-800 rounded border border-slate-700 cursor-pointer hover:border-slate-500 hover:text-slate-300 transition-colors" onClick={() => setQuery('Is there a bubble in AI stocks?')}>🤖 AI Bubble</span>
-                <span className="px-2 py-1 bg-slate-800 rounded border border-slate-700 cursor-pointer hover:border-slate-500 hover:text-slate-300 transition-colors" onClick={() => setQuery('Analyze Housing Market 2024')}>🏠 Housing</span>
-                <span className="px-2 py-1 bg-slate-800 rounded border border-slate-700 cursor-pointer hover:border-slate-500 hover:text-slate-300 transition-colors" onClick={() => setQuery('Crypto Market Outlook')}>🪙 Crypto</span>
+                <span className="px-2 py-1 bg-slate-800 rounded border border-slate-700 cursor-pointer hover:border-slate-500 hover:text-slate-300 transition-colors" onClick={() => { setQuery('Is there a bubble in AI stocks?'); performAnalysis('Is there a bubble in AI stocks?'); }}>🤖 AI Bubble</span>
+                <span className="px-2 py-1 bg-slate-800 rounded border border-slate-700 cursor-pointer hover:border-slate-500 hover:text-slate-300 transition-colors" onClick={() => { setQuery('Analyze Housing Market 2024'); performAnalysis('Analyze Housing Market 2024'); }}>🏠 Housing</span>
+                <span className="px-2 py-1 bg-slate-800 rounded border border-slate-700 cursor-pointer hover:border-slate-500 hover:text-slate-300 transition-colors" onClick={() => { setQuery('Crypto Market Outlook'); performAnalysis('Crypto Market Outlook'); }}>🪙 Crypto</span>
              </div>
            </div>
         </div>
@@ -366,7 +264,7 @@ const App: React.FC = () => {
           <div className="max-w-2xl mx-auto text-center py-20 bg-rose-950/10 border border-rose-900/50 rounded-2xl">
             <AlertTriangle className="w-16 h-16 text-rose-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-white mb-2">Analysis Failed</h2>
-            <p className="text-slate-400 mb-6">{error}</p>
+            <p className="text-slate-400 mb-6 px-4">{error}</p>
             <button 
               onClick={handleRetry}
               className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-2 rounded-lg border border-slate-700 transition-colors"
@@ -404,21 +302,21 @@ const App: React.FC = () => {
         {view === ViewState.DASHBOARD && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-20 opacity-80">
              {/* Feature Cards for Aesthetic filler */}
-             <div className="p-6 bg-slate-800/30 border border-slate-800 rounded-xl hover:border-slate-600 transition-colors group">
+             <div className="p-6 bg-slate-800/30 border border-slate-800 rounded-xl hover:border-slate-600 transition-colors group cursor-pointer" onClick={() => performAnalysis('Deep Fundamental Scan of major tech stocks')}>
                 <div className="w-12 h-12 bg-sky-900/30 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                    <BarChart3 className="w-6 h-6 text-sky-400" />
                 </div>
                 <h3 className="font-bold text-lg text-slate-200 mb-2">Deep Fundamental Scan</h3>
                 <p className="text-sm text-slate-400">Automated analysis of P/E, PEG, debt ratios, and cash flow health.</p>
              </div>
-             <div className="p-6 bg-slate-800/30 border border-slate-800 rounded-xl hover:border-slate-600 transition-colors group">
+             <div className="p-6 bg-slate-800/30 border border-slate-800 rounded-xl hover:border-slate-600 transition-colors group cursor-pointer" onClick={() => performAnalysis('Find fair value estimates for trending stocks')}>
                 <div className="w-12 h-12 bg-emerald-900/30 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                    <DollarSign className="w-6 h-6 text-emerald-400" />
                 </div>
                 <h3 className="font-bold text-lg text-slate-200 mb-2">Fair Value Estimation</h3>
                 <p className="text-sm text-slate-400">AI-driven valuation models to detect over-hyped assets.</p>
              </div>
-             <div className="p-6 bg-slate-800/30 border border-slate-800 rounded-xl hover:border-slate-600 transition-colors group">
+             <div className="p-6 bg-slate-800/30 border border-slate-800 rounded-xl hover:border-slate-600 transition-colors group cursor-pointer" onClick={() => performAnalysis('Detect current market bubbles and overvaluation risks')}>
                 <div className="w-12 h-12 bg-rose-900/30 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                    <PieChart className="w-6 h-6 text-rose-400" />
                 </div>

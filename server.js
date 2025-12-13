@@ -17,20 +17,22 @@ app.use(express.static(join(__dirname, 'dist')));
 app.post('/api/analyze', async (req, res) => {
   try {
     const { mode, data } = req.body;
+    // Strictly use API_KEY as per guidelines
     const apiKey = process.env.API_KEY;
 
     if (!apiKey) {
-      return res.status(500).json({ error: 'Server Config Error: API_KEY is missing.' });
+      console.error("CRITICAL: API_KEY is missing from environment variables.");
+      return res.status(500).json({ error: 'Server Config Error: API_KEY is missing. Please add it to your environment variables (e.g. Render/Vercel Dashboard).' });
     }
 
     const ai = new GoogleGenAI({ apiKey });
+    // Use the correct model for text tasks
     const modelId = "gemini-2.5-flash"; 
 
     let systemInstruction = '';
     let prompt = '';
 
     if (mode === 'market') {
-      // We rely on Gemini's Google Search tool to find the price and info
       prompt = `
         Perform a financial analysis for: "${data}".
         
@@ -72,7 +74,6 @@ app.post('/api/analyze', async (req, res) => {
 
     } else if (mode === 'portfolio') {
       const portfolioItems = data;
-      // Construct a summary string for Gemini to digest
       const summary = portfolioItems.map(p => `${p.quantity} shares of ${p.symbol} (Bought @ $${p.buyPrice})`).join(', ');
       
       prompt = `
@@ -98,13 +99,14 @@ app.post('/api/analyze', async (req, res) => {
       contents: prompt,
       config: {
         systemInstruction: systemInstruction,
-        // ENABLE GOOGLE SEARCH TOOL
+        // ENABLE GOOGLE SEARCH TOOL for Real-time data
         tools: [{ googleSearch: {} }],
         maxOutputTokens: 2500, 
       },
     });
 
     const heartbeat = setInterval(() => {
+        // Keep connection alive
         res.write("  "); 
     }, 1000);
 
@@ -118,15 +120,13 @@ app.post('/api/analyze', async (req, res) => {
                 res.write(text);
             }
             
-            // Capture grounding metadata (Sources) from the chunks
             if (chunk.groundingMetadata?.groundingChunks) {
                 accumulatedGrounding.push(...chunk.groundingMetadata.groundingChunks);
             }
         }
         
-        // Append metadata for frontend to display sources
         if (accumulatedGrounding.length > 0) {
-            // Filter duplicates based on URI
+            // Filter duplicates
             const uniqueSources = [];
             const seenUris = new Set();
             for (const g of accumulatedGrounding) {
@@ -141,6 +141,7 @@ app.post('/api/analyze', async (req, res) => {
     } catch (streamError) {
         clearInterval(heartbeat);
         console.error("Streaming Error:", streamError);
+        // Write the error to the stream so the client can show it, if headers haven't been closed
         res.write(`\n\n[System Error: ${streamError.message}]`);
     } finally {
         clearInterval(heartbeat);
@@ -150,6 +151,7 @@ app.post('/api/analyze', async (req, res) => {
   } catch (error) {
     console.error("Server Error:", error);
     if (!res.headersSent) {
+        // This ensures the frontend gets the JSON error message
         res.status(500).json({ error: error.message || 'Server Internal Error' });
     } else {
         res.end();
@@ -157,14 +159,14 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
-// Handle React Routing
-app.get('*', (req, res) => {
-    try {
-        res.sendFile(join(__dirname, 'dist', 'index.html'));
-    } catch (e) {
-        res.status(404).send('Not Found (Did you run npm run build?)');
+// Startup Log
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`\n> Server running on port ${PORT}`);
+    if (process.env.API_KEY) {
+        console.log(`> Security: API_KEY detected (${process.env.API_KEY.slice(0,5)}...)`);
+        console.log(`> Ready for analysis.\n`);
+    } else {
+        console.log(`> WARNING: API_KEY is missing in .env file\n`);
     }
 });
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
