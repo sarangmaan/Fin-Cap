@@ -26,7 +26,9 @@ import {
   Target,
   AlertOctagon,
   MinusCircle,
-  WifiOff
+  WifiOff,
+  Loader2,
+  ScanEye
 } from 'lucide-react';
 
 interface AnalysisViewProps {
@@ -75,20 +77,47 @@ const SwotCard: React.FC<{ title: string; items: string[]; type: 'strength' | 'w
   );
 };
 
+// Skeleton Loader Component
+const Skeleton: React.FC<{ className?: string }> = ({ className }) => (
+  <div className={`animate-pulse bg-slate-800/50 rounded-xl ${className}`}></div>
+);
+
 const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
   const { markdownReport, structuredData, groundingChunks, isEstimated } = data;
+  const isStreaming = !structuredData;
+
+  // Determine Alert Box Styling
+  const isHighRisk = structuredData?.riskLevel === 'Critical' || 
+                     structuredData?.riskLevel === 'High' || 
+                     structuredData?.bubbleAudit?.valuationVerdict === 'Bubble Territory' || 
+                     structuredData?.bubbleAudit?.valuationVerdict === 'Overvalued';
+
+  const alertBoxClass = isHighRisk 
+    ? 'bg-rose-950/20 border-rose-500/30' 
+    : 'bg-slate-800/40 border-slate-700/50';
+    
+  const alertIconClass = isHighRisk ? 'text-rose-500' : 'text-yellow-500';
 
   return (
     <div className="animate-fade-in pb-20">
       
       {/* Title Section */}
-      <div className="mb-8 border-b border-slate-700/50 pb-6 text-center">
+      <div className="mb-8 border-b border-slate-700/50 pb-6 text-center relative">
          <h1 className="text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-2 drop-shadow-lg">{title}</h1>
          
          {!isEstimated ? (
             <div className="text-sm text-slate-400 flex items-center justify-center gap-2 font-mono">
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
-                LIVE AI ANALYSIS REPORT
+                {isStreaming ? (
+                    <>
+                        <Loader2 className="w-4 h-4 animate-spin text-sky-500" />
+                        GENERATING LIVE ANALYSIS...
+                    </>
+                ) : (
+                    <>
+                        <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+                        LIVE AI ANALYSIS REPORT
+                    </>
+                )}
             </div>
          ) : (
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/10 border border-yellow-500/40 rounded-full text-yellow-300 text-xs font-bold uppercase tracking-wider mt-2">
@@ -99,7 +128,14 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
       </div>
 
       {/* Top Level Summary Cards */}
-      {structuredData && (
+      {isStreaming ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+             <Skeleton className="h-40" />
+             <Skeleton className="h-40" />
+             <Skeleton className="h-40" />
+             <Skeleton className="h-40" />
+          </div>
+      ) : structuredData && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <RiskGauge score={structuredData.riskScore} label="Risk Score" type="risk" />
           <RiskGauge score={structuredData.bubbleProbability} label="Bubble Probability" type="bubble" />
@@ -134,7 +170,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
 
       {/* SWOT Analysis Section */}
       {structuredData?.swot && (
-        <div className="mb-8">
+        <div className="mb-8 animate-fade-in">
            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
              <Target className="w-5 h-5 text-sky-400" />
              Strategic Analysis (SWOT)
@@ -152,16 +188,17 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Left Col: Written Report */}
-        <div className="lg:col-span-2 bg-slate-800/40 p-8 rounded-2xl border border-slate-700/50 shadow-xl backdrop-blur-sm">
+        <div className="lg:col-span-2 bg-slate-800/40 p-8 rounded-2xl border border-slate-700/50 shadow-xl backdrop-blur-sm min-h-[500px]">
           <div className="flex items-center gap-3 mb-6 border-b border-slate-700 pb-4">
              <ShieldCheck className="w-6 h-6 text-sky-400" />
              <h2 className="text-3xl font-bold text-white">Analyst Report</h2>
+             {isStreaming && <Loader2 className="w-5 h-5 animate-spin text-slate-500 ml-auto" />}
           </div>
           <MarkdownRenderer content={markdownReport} />
           
           {/* Sources Section - Hide if estimated */}
           {!isEstimated && groundingChunks && groundingChunks.length > 0 && (
-             <div className="mt-12 pt-6 border-t border-slate-700">
+             <div className="mt-12 pt-6 border-t border-slate-700 animate-fade-in">
                 <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Sources & References</h4>
                 <div className="flex flex-wrap gap-2">
                    {groundingChunks.map((chunk, i) => (
@@ -185,8 +222,20 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
         <div className="space-y-6">
           
           {/* Chart Card */}
-          {structuredData?.trendData && structuredData.trendData.length > 0 && (
-            <div className="bg-slate-800/40 p-6 rounded-2xl border border-slate-700/50 shadow-lg backdrop-blur-sm">
+          {isStreaming ? (
+              <div className="space-y-6">
+                  <div className="bg-slate-800/40 p-6 rounded-2xl border border-slate-700/50">
+                      <div className="flex items-center gap-2 mb-6">
+                          <Skeleton className="w-6 h-6 rounded-full" />
+                          <Skeleton className="w-32 h-6 rounded" />
+                      </div>
+                      <Skeleton className="h-64 w-full mb-6" />
+                      <Skeleton className="h-24 w-full" />
+                  </div>
+                  <Skeleton className="h-40 w-full rounded-2xl" />
+              </div>
+          ) : structuredData?.trendData && structuredData.trendData.length > 0 && (
+            <div className="bg-slate-800/40 p-6 rounded-2xl border border-slate-700/50 shadow-lg backdrop-blur-sm animate-fade-in">
               <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-emerald-400" />
                 Technical Analysis
@@ -282,54 +331,81 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
             </div>
           )}
 
-          {/* Early Warning Card */}
-          <div className={`p-6 rounded-2xl border shadow-lg backdrop-blur-sm ${
-             structuredData?.riskLevel === 'Critical' || structuredData?.riskLevel === 'High' 
-             ? 'bg-rose-950/20 border-rose-500/30' 
-             : 'bg-slate-800/40 border-slate-700/50'
-          }`}>
-             <div className="flex items-center gap-3 mb-4">
-                <AlertTriangle className={`w-6 h-6 ${
-                  structuredData?.riskLevel === 'Critical' || structuredData?.riskLevel === 'High' 
-                  ? 'text-rose-500' 
-                  : 'text-yellow-500'
-                }`} />
-                <h3 className="text-xl font-bold text-white">Early Warning System</h3>
-             </div>
-             
-             <div className="space-y-4">
-                <div className="flex justify-between items-center text-sm border-b border-white/10 pb-3">
-                   <span className="text-slate-300 font-medium">Bubble Status</span>
-                   <span className={`font-bold tracking-wider ${
-                      structuredData?.bubbleProbability && structuredData.bubbleProbability > 60 ? 'text-rose-400' : 'text-emerald-400'
-                   }`}>
-                      {structuredData?.bubbleProbability && structuredData.bubbleProbability > 60 ? 'DETECTED' : 'STABLE'}
-                   </span>
-                </div>
-
-                {structuredData?.warningSignals && structuredData.warningSignals.length > 0 ? (
-                  <div className="space-y-2">
-                     <p className="text-xs font-bold text-slate-400 uppercase">Risk Factors & Signals:</p>
-                     <ul className="space-y-2">
-                        {structuredData.warningSignals.map((signal, idx) => (
-                           <li key={idx} className="text-sm text-slate-300 flex items-start gap-2 leading-tight">
-                              <span className="text-rose-400 mt-0.5 text-xs">●</span>
-                              {signal}
-                           </li>
-                        ))}
-                     </ul>
+          {/* Bubble Warning System (Unified Card) */}
+          {structuredData && (
+             <div className={`p-6 rounded-2xl border shadow-lg backdrop-blur-sm animate-fade-in ${alertBoxClass}`}>
+               <div className="flex items-center gap-3 mb-4">
+                  <AlertTriangle className={`w-6 h-6 ${alertIconClass}`} />
+                  <h3 className="text-xl font-bold text-white">Bubble Warning</h3>
+               </div>
+               
+               <div className="space-y-4">
+                  {/* Status Row */}
+                  <div className="flex justify-between items-center text-sm border-b border-white/10 pb-3">
+                     <span className="text-slate-300 font-medium">Risk Status</span>
+                     <span className={`font-bold tracking-wider ${
+                        isHighRisk ? 'text-rose-400' : 'text-emerald-400'
+                     }`}>
+                        {isHighRisk ? 'ELEVATED' : 'STABLE'}
+                     </span>
                   </div>
-                ) : (
-                   <div className="text-sm text-slate-300 leading-relaxed">
-                      {structuredData?.riskLevel === 'Critical' 
-                       ? "Immediate caution advised. Indicators suggest a high probability of correction. Capital preservation strategies recommended."
-                       : structuredData?.riskLevel === 'High'
-                       ? "Significant downside risks identified. Volatility expected to increase. Monitor stop-losses closely."
-                       : "Market conditions appear stable, but standard risk management protocols should remain in effect."}
-                   </div>
-                )}
+
+                  {/* Detailed Bubble Audit info if available */}
+                  {structuredData.bubbleAudit && (
+                      <div className="space-y-3 pt-1">
+                          <div>
+                              <div className="text-xs text-slate-400 uppercase font-bold mb-1 flex justify-between">
+                                  <span>Valuation Verdict</span>
+                                  <span className={isHighRisk ? 'text-rose-400' : 'text-emerald-400'}>
+                                      {structuredData.bubbleAudit.valuationVerdict}
+                                  </span>
+                              </div>
+                              {/* Simple Bar */}
+                              <div className="w-full h-1.5 bg-slate-900/50 rounded-full overflow-hidden">
+                                  <div className={`h-full rounded-full ${isHighRisk ? 'bg-rose-500' : 'bg-emerald-500'}`} style={{ width: `${structuredData.bubbleAudit.score}%` }}></div>
+                              </div>
+                          </div>
+
+                          <div className="grid gap-3 pt-2">
+                             <div className="bg-slate-900/30 p-2.5 rounded border border-white/5">
+                                 <span className="text-xs text-slate-500 uppercase font-bold block mb-1">Fundamentals</span>
+                                 <p className="text-xs text-slate-300 leading-snug">{structuredData.bubbleAudit.fundamentalDivergence}</p>
+                             </div>
+                             <div className="bg-slate-900/30 p-2.5 rounded border border-white/5">
+                                 <span className="text-xs text-slate-500 uppercase font-bold block mb-1">Peer Context</span>
+                                 <p className="text-xs text-slate-300 leading-snug">{structuredData.bubbleAudit.peerComparison}</p>
+                             </div>
+                          </div>
+                          
+                          <div className="flex justify-between items-center text-xs pt-1">
+                                <span className="text-slate-500 font-bold uppercase">Speculative Activity</span>
+                                <span className={`font-mono font-bold ${
+                                    structuredData.bubbleAudit.speculativeActivity === 'Extreme' || structuredData.bubbleAudit.speculativeActivity === 'High' 
+                                    ? 'text-rose-400' : 'text-emerald-400'
+                                }`}>
+                                    {structuredData.bubbleAudit.speculativeActivity}
+                                </span>
+                          </div>
+                      </div>
+                  )}
+
+                  {/* Warning Signals List */}
+                  {structuredData.warningSignals && structuredData.warningSignals.length > 0 && (
+                    <div className="mt-4 pt-3 border-t border-white/10 space-y-2">
+                       <p className="text-xs font-bold text-slate-400 uppercase">Warning Signals:</p>
+                       <ul className="space-y-2">
+                          {structuredData.warningSignals.map((signal, idx) => (
+                             <li key={idx} className="text-sm text-slate-300 flex items-start gap-2 leading-tight">
+                                <span className="text-rose-400 mt-0.5 text-xs">●</span>
+                                {signal}
+                             </li>
+                          ))}
+                       </ul>
+                    </div>
+                  )}
+               </div>
              </div>
-          </div>
+          )}
 
         </div>
       </div>

@@ -9,7 +9,9 @@ if (!apiKey) {
 }
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-export const analyzeMarket = async (query: string): Promise<AnalysisResult> => {
+type StreamUpdate = (data: Partial<AnalysisResult>) => void;
+
+export const analyzeMarket = async (query: string, onUpdate?: StreamUpdate): Promise<AnalysisResult> => {
   if (!apiKey) throw new Error("API Key is missing. Please add 'API_KEY' to your Render Environment Variables and Redeploy.");
 
   const prompt = `
@@ -46,6 +48,10 @@ export const analyzeMarket = async (query: string): Promise<AnalysisResult> => {
     4. **Final Verdict**:
         - Format strictly as: [[[BUY]]] or [[[SELL]]] or [[[HOLD]]] or [[[CAUTION]]]
 
+    **IMPORTANT CONSTRAINTS**:
+    - **DO NOT** write a "SWOT Analysis" section in the Markdown text. The SWOT data must ONLY be provided in the JSON block to avoid visual duplication.
+    - Keep the Markdown concise and actionable.
+
     **DATA STRUCTURE (JSON)**:
     Generate a valid JSON block at the very end of your response inside \`\`\`json code fences.
     {
@@ -56,21 +62,25 @@ export const analyzeMarket = async (query: string): Promise<AnalysisResult> => {
       "keyMetrics": [ { "label": "Price", "value": "$..." } ],
       "trendData": [ 
         // MANDATORY: Generate exactly 15 data points representing the last 30 days of price action.
-        // Label format: "MM-DD". Value: Price. ma50: 50-day Moving Avg. rsi: RSI (0-100).
-        // If exact historical data is not found, SYNTHESIZE a realistic trend based on the current price and volatility.
-        // DO NOT return a single point. The chart needs a line.
         { "label": "01-01", "value": 145.20, "ma50": 142.50, "rsi": 55 },
         { "label": "01-02", "value": 147.10, "ma50": 143.00, "rsi": 58 }
       ], 
       "warningSignals": [ "Signal 1" ],
-      "swot": { "strengths": [], "weaknesses": [], "opportunities": [], "threats": [] }
+      "swot": { "strengths": [], "weaknesses": [], "opportunities": [], "threats": [] },
+      "bubbleAudit": {
+        "valuationVerdict": "Undervalued" | "Fair Value" | "Overvalued" | "Bubble Territory",
+        "score": number (0-100),
+        "fundamentalDivergence": "Brief sentence explaining if price is ahead of earnings/revenue.",
+        "peerComparison": "Brief sentence comparing P/E or valuation to sector peers.",
+        "speculativeActivity": "Low" | "Moderate" | "High" | "Extreme"
+      }
     }
   `;
 
-  return await executeGeminiRequest(prompt, systemInstruction);
+  return await executeGeminiRequest(prompt, systemInstruction, onUpdate);
 };
 
-export const analyzePortfolio = async (portfolio: PortfolioItem[]): Promise<AnalysisResult> => {
+export const analyzePortfolio = async (portfolio: PortfolioItem[], onUpdate?: StreamUpdate): Promise<AnalysisResult> => {
   if (!apiKey) throw new Error("API Key is missing. Please add 'API_KEY' to your Render Environment Variables and Redeploy.");
 
   const summary = portfolio.map(p => `${p.quantity} shares of ${p.symbol} (Bought @ $${p.buyPrice})`).join(', ');
@@ -86,13 +96,68 @@ export const analyzePortfolio = async (portfolio: PortfolioItem[]): Promise<Anal
     Output:
     1. Markdown Report (Assessment, Diversification Check, Actionable Advice).
     2. JSON Data Block (same schema as market analysis, including 'trendData' for the overall portfolio value over time).
+    
+    Constraint: Do NOT include a text-based SWOT section. Use the JSON for SWOT.
   `;
 
-  return await executeGeminiRequest(prompt, systemInstruction);
+  return await executeGeminiRequest(prompt, systemInstruction, onUpdate);
 };
 
+export const analyzeBubbles = async (onUpdate?: StreamUpdate): Promise<AnalysisResult> => {
+    if (!apiKey) throw new Error("API Key is missing. Please add 'API_KEY' to your Render Environment Variables and Redeploy.");
+
+    const prompt = `
+      Scan the current global financial markets (Stocks, Crypto, Real Estate) for Bubbles and Overvaluation.
+      
+      TASK:
+      1. SEARCH for sectors with historically high P/E ratios, FOMO sentiment, or disconnected valuations.
+      2. SEARCH for "Market Crash Warning [Current Year]" and "Overvalued Stocks [Current Month]".
+      3. Identify specific assets (e.g., AI Stocks, Specific Coins, Housing Markets) that are at risk.
+    `;
+    
+    const systemInstruction = `
+      Role: Forensic Financial Analyst & Crash Predictor.
+      Tone: Serious, Cautionary, Data-Driven.
+
+      **REPORT STRUCTURE (Markdown)**:
+      1. **Global Bubble Index**: Summary of overall market frothiness.
+      2. **The "Red Zones"**: Detailed breakdown of the most dangerous sectors.
+      3. **Historical Parallels**: Comparison to Dot-com (2000) or 2008 if relevant.
+      4. **Safe Havens**: Where capital is flowing for safety.
+      
+      **IMPORTANT**: DO NOT write a SWOT analysis in text.
+
+      **DATA STRUCTURE (JSON)**:
+      Generate a valid JSON block at the very end of your response inside \`\`\`json code fences.
+      {
+        "riskScore": number (Overall Market Risk 0-100),
+        "riskLevel": "Low" | "Moderate" | "High" | "Critical",
+        "bubbleProbability": number (0-100),
+        "marketSentiment": "Bearish" | "Neutral" | "Euphoric",
+        "keyMetrics": [ { "label": "VIX", "value": "15.2" }, { "label": "Buffett Indicator", "value": "180%" } ],
+        "trendData": [ 
+          // Generate a chart showing the divergence between Price and Fundamental Value over the last year for the most bubbled asset
+          { "label": "Jan", "value": 100, "ma50": 100 }, 
+          { "label": "Feb", "value": 110, "ma50": 102 } 
+        ], 
+        "warningSignals": [ "Extreme Greed Index", "RSI Divergence" ],
+        "topBubbleAssets": [
+            { 
+               "name": "Name of Asset/Sector", 
+               "riskScore": 90, 
+               "sector": "Tech", 
+               "price": "$123.45",
+               "reason": "Trading at 200x earnings with slowing growth."
+            }
+        ]
+      }
+    `;
+  
+    return await executeGeminiRequest(prompt, systemInstruction, onUpdate);
+  };
+
 // Common execution logic
-async function executeGeminiRequest(prompt: string, systemInstruction: string): Promise<AnalysisResult> {
+async function executeGeminiRequest(prompt: string, systemInstruction: string, onUpdate?: StreamUpdate): Promise<AnalysisResult> {
   try {
     const result = await ai.models.generateContentStream({
       model: "gemini-2.5-flash",
@@ -105,11 +170,21 @@ async function executeGeminiRequest(prompt: string, systemInstruction: string): 
 
     let fullText = "";
     let groundingChunks: any[] = [];
+    let hasSentInitialUpdate = false;
 
     // Iterate through the stream
     for await (const chunk of result) {
       if (chunk.text) {
         fullText += chunk.text;
+        
+        // Stream text update to UI immediately
+        if (onUpdate) {
+            onUpdate({ 
+                markdownReport: fullText,
+                isEstimated: false
+            });
+            hasSentInitialUpdate = true;
+        }
       }
       const metadata = chunk.candidates?.[0]?.groundingMetadata;
       if (metadata?.groundingChunks) {
@@ -145,12 +220,17 @@ async function executeGeminiRequest(prompt: string, systemInstruction: string): 
         }
     }
 
-    return {
+    const finalResult = {
       markdownReport: cleanReport || "Analysis generated, but format was unexpected.",
       structuredData,
       groundingChunks: uniqueSources,
       isEstimated: false
     };
+
+    // Final update with everything
+    if (onUpdate) onUpdate(finalResult);
+
+    return finalResult;
 
   } catch (error: any) {
     console.error("Gemini API Error:", error);

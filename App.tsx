@@ -2,10 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ViewState, AnalysisResult, PortfolioItem } from './types';
 import AnalysisView from './components/AnalysisView';
 import PortfolioView from './components/PortfolioView';
+import BubbleScopeView from './components/BubbleScopeView';
 import Logo from './components/Logo';
 import { Search, BarChart3, AlertTriangle, TrendingUp, DollarSign, PieChart, Activity } from 'lucide-react';
 import { stocks } from './data/stocks';
-import { analyzeMarket, analyzePortfolio } from './services/geminiService';
+import { analyzeMarket, analyzePortfolio, analyzeBubbles } from './services/geminiService';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(ViewState.DASHBOARD);
@@ -35,14 +36,29 @@ const App: React.FC = () => {
     setShowSuggestions(false);
     setLoading(true);
     setError(null);
+    setAnalyzedQuery(searchQuery);
+    
+    // Start with the Loading View (Spinners)
     setView(ViewState.ANALYZING);
+    setResult(null);
 
     try {
-      const result = await analyzeMarket(searchQuery);
-
-      setResult(result);
-      setAnalyzedQuery(searchQuery);
-      setView(ViewState.REPORT);
+      // Pass a callback to update state as chunks arrive
+      await analyzeMarket(searchQuery, (partialResult) => {
+          setResult((prev) => {
+             // If we have text content, switch to Report view immediately to show streaming
+             if (partialResult.markdownReport && partialResult.markdownReport.length > 5) {
+                 setView(ViewState.REPORT);
+             }
+             return {
+                markdownReport: partialResult.markdownReport || prev?.markdownReport || "",
+                structuredData: partialResult.structuredData || prev?.structuredData,
+                groundingChunks: partialResult.groundingChunks || prev?.groundingChunks,
+                isEstimated: partialResult.isEstimated
+             };
+          });
+      });
+      
     } catch (err: any) {
       console.error("Search Analysis Failed:", err);
       setError(err.message || 'Something went wrong.');
@@ -52,22 +68,42 @@ const App: React.FC = () => {
     }
   };
 
+  // Handle Query Params on Load (Legacy Support)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get('q');
+    if (q) {
+      setQuery(q);
+      performAnalysis(q);
+    }
+  }, []);
+
   const handleAnalyzePortfolio = async () => {
     // 1. Validation Check
     if (portfolioItems.length === 0) return;
     
     setLoading(true);
-    setView(ViewState.ANALYZING);
     setError(null);
+    setAnalyzedQuery("Portfolio Risk Audit");
+    setView(ViewState.ANALYZING);
+    setResult(null);
 
     try {
       console.log("Sending portfolio to Gemini for analysis...");
       
-      const result = await analyzePortfolio(portfolioItems);
-
-      setResult(result);
-      setAnalyzedQuery("Portfolio Risk Audit");
-      setView(ViewState.REPORT);
+      await analyzePortfolio(portfolioItems, (partialResult) => {
+          setResult((prev) => {
+             if (partialResult.markdownReport && partialResult.markdownReport.length > 5) {
+                 setView(ViewState.REPORT);
+             }
+             return {
+                markdownReport: partialResult.markdownReport || prev?.markdownReport || "",
+                structuredData: partialResult.structuredData || prev?.structuredData,
+                groundingChunks: partialResult.groundingChunks || prev?.groundingChunks,
+                isEstimated: partialResult.isEstimated
+             };
+          });
+      });
 
     } catch (err: any) {
       console.error("Analysis Failed:", err);
@@ -76,6 +112,31 @@ const App: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBubbleScope = async () => {
+      setLoading(true);
+      setError(null);
+      setAnalyzedQuery("Global Market Bubble Scope");
+      setView(ViewState.BUBBLE_SCOPE);
+      setResult({ markdownReport: "Initiating Global Market Scan...", isEstimated: false });
+
+      try {
+          await analyzeBubbles((partialResult) => {
+              setResult((prev) => ({
+                  markdownReport: partialResult.markdownReport || prev?.markdownReport || "",
+                  structuredData: partialResult.structuredData || prev?.structuredData,
+                  groundingChunks: partialResult.groundingChunks || prev?.groundingChunks,
+                  isEstimated: partialResult.isEstimated
+              }));
+          });
+      } catch (err: any) {
+          console.error("Bubble Scope Failed:", err);
+          setError(err.message || 'Bubble Scope analysis failed.');
+          setView(ViewState.ERROR);
+      } finally {
+          setLoading(false);
+      }
   };
   
   // Autocomplete state
@@ -153,9 +214,7 @@ const App: React.FC = () => {
       } else if (viewName === 'Markets') {
           setView(ViewState.DASHBOARD);
       } else if (viewName === 'Bubble Scope') {
-          const bubbleQuery = "Analyze global market bubbles, overvalued sectors, and crash risks for the current year.";
-          setQuery(bubbleQuery);
-          performAnalysis(bubbleQuery);
+          handleBubbleScope();
       }
   };
 
@@ -165,7 +224,7 @@ const App: React.FC = () => {
       {/* Navigation */}
       <nav className="sticky top-0 z-50 border-b border-white/10 bg-[#0f172a]/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView(ViewState.DASHBOARD)}>
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => { setView(ViewState.DASHBOARD); handleNavClick('Markets'); }}>
             {/* Logo Container with Glow */}
             <div className="relative flex items-center justify-center">
                <div className="absolute inset-0 bg-sky-500/20 blur-lg rounded-full"></div>
@@ -173,10 +232,12 @@ const App: React.FC = () => {
             </div>
             <span className="font-bold text-xl tracking-tight text-white">Fin<span className="text-sky-400">Cap</span></span>
           </div>
-          <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400">
-            <button onClick={() => handleNavClick('Markets')} className={`hover:text-white transition-colors cursor-pointer bg-transparent border-0 ${view === ViewState.DASHBOARD ? 'text-white font-bold' : ''}`}>Markets</button>
-            <button onClick={() => handleNavClick('Portfolio')} className={`hover:text-white transition-colors cursor-pointer bg-transparent border-0 ${view === ViewState.PORTFOLIO ? 'text-white font-bold' : ''}`}>Portfolio Tracker</button>
-            <button onClick={() => handleNavClick('Bubble Scope')} className="hover:text-rose-400 text-slate-400 transition-colors cursor-pointer bg-transparent border-0 flex items-center gap-1">
+          
+          {/* Menu Items - Changed from hidden md:flex to flex with overflow for mobile visibility */}
+          <div className="flex items-center gap-2 md:gap-6 text-sm font-medium text-slate-400 overflow-x-auto no-scrollbar mask-gradient pr-4">
+            <button onClick={() => handleNavClick('Markets')} className={`whitespace-nowrap px-3 py-1.5 rounded-full hover:text-white transition-colors cursor-pointer bg-transparent border border-transparent ${view === ViewState.DASHBOARD || view === ViewState.REPORT ? 'text-white font-bold bg-slate-800 border-slate-700' : ''}`}>Markets</button>
+            <button onClick={() => handleNavClick('Portfolio')} className={`whitespace-nowrap px-3 py-1.5 rounded-full hover:text-white transition-colors cursor-pointer bg-transparent border border-transparent ${view === ViewState.PORTFOLIO ? 'text-white font-bold bg-slate-800 border-slate-700' : ''}`}>Portfolio</button>
+            <button onClick={() => handleNavClick('Bubble Scope')} className={`whitespace-nowrap px-3 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1 ${view === ViewState.BUBBLE_SCOPE ? 'bg-rose-950/30 text-rose-400 border border-rose-500/50 font-bold' : 'text-rose-400/80 hover:text-rose-400 hover:bg-rose-950/10'}`}>
                <Activity className="w-4 h-4" /> Bubble Scope
             </button>
           </div>
@@ -196,7 +257,7 @@ const App: React.FC = () => {
               </p>
            </div>
            
-           <div ref={searchContainerRef} className={`max-w-2xl mx-auto relative group ${view === ViewState.REPORT || view === ViewState.PORTFOLIO ? 'scale-90 opacity-0 h-0 overflow-hidden' : ''}`}>
+           <div ref={searchContainerRef} className={`max-w-2xl mx-auto relative group ${view === ViewState.REPORT || view === ViewState.PORTFOLIO || view === ViewState.BUBBLE_SCOPE ? 'scale-90 opacity-0 h-0 overflow-hidden' : ''}`}>
              <div className="absolute -inset-0.5 bg-gradient-to-r from-sky-500 to-emerald-500 rounded-xl blur opacity-30 group-hover:opacity-60 transition duration-1000"></div>
              <form onSubmit={handleSearch} className="relative flex">
                <input 
@@ -282,11 +343,28 @@ const App: React.FC = () => {
           />
         )}
 
+        {view === ViewState.BUBBLE_SCOPE && result && (
+            <div>
+                 <div className="flex items-center justify-between mb-8">
+                   <button 
+                    onClick={() => { setView(ViewState.DASHBOARD); handleNavClick('Markets'); }}
+                    className="text-sm text-slate-400 hover:text-white flex items-center gap-2 transition-colors"
+                   >
+                     ← Back to Markets
+                   </button>
+                   <span className="text-xs text-rose-400 border border-rose-900/50 px-3 py-1 rounded-full bg-rose-950/20">
+                      LIVE SYSTEMIC RISK MONITOR
+                   </span>
+                </div>
+                <BubbleScopeView data={result} />
+            </div>
+        )}
+
         {view === ViewState.REPORT && result && (
           <div>
             <div className="flex items-center justify-between mb-8">
                <button 
-                onClick={() => setView(ViewState.DASHBOARD)}
+                onClick={() => { setView(ViewState.DASHBOARD); handleNavClick('Markets'); }}
                 className="text-sm text-slate-400 hover:text-white flex items-center gap-2 transition-colors"
                >
                  ← New Analysis
@@ -316,7 +394,7 @@ const App: React.FC = () => {
                 <h3 className="font-bold text-lg text-slate-200 mb-2">Fair Value Estimation</h3>
                 <p className="text-sm text-slate-400">AI-driven valuation models to detect over-hyped assets.</p>
              </div>
-             <div className="p-6 bg-slate-800/30 border border-slate-800 rounded-xl hover:border-slate-600 transition-colors group cursor-pointer" onClick={() => performAnalysis('Detect current market bubbles and overvaluation risks')}>
+             <div className="p-6 bg-slate-800/30 border border-slate-800 rounded-xl hover:border-slate-600 transition-colors group cursor-pointer" onClick={() => handleBubbleScope()}>
                 <div className="w-12 h-12 bg-rose-900/30 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                    <PieChart className="w-6 h-6 text-rose-400" />
                 </div>

@@ -6,6 +6,14 @@ export interface ChartDataPoint {
   rsi?: number;
 }
 
+export interface BubbleAudit {
+  valuationVerdict: 'Undervalued' | 'Fair Value' | 'Overvalued' | 'Bubble Territory';
+  score: number; // 0-100 (Bubble intensity)
+  fundamentalDivergence: string; // Explanation of price vs value
+  peerComparison: string; // Context vs sector
+  speculativeActivity: 'Low' | 'Moderate' | 'High' | 'Extreme';
+}
+
 export interface StructuredAnalysisData {
   riskScore: number; // 0-100
   riskLevel: 'Low' | 'Moderate' | 'High' | 'Critical';
@@ -20,6 +28,16 @@ export interface StructuredAnalysisData {
     opportunities: string[];
     threats: string[];
   };
+  // Specific Bubble Audit for the searched asset
+  bubbleAudit?: BubbleAudit;
+  // New field for Bubble Scope view
+  topBubbleAssets?: {
+    name: string;
+    riskScore: number;
+    sector: string;
+    price: string;
+    reason: string;
+  }[];
 }
 
 export interface GroundingChunk {
@@ -50,5 +68,6 @@ export enum ViewState {
   ANALYZING = 'ANALYZING',
   REPORT = 'REPORT',
   PORTFOLIO = 'PORTFOLIO',
+  BUBBLE_SCOPE = 'BUBBLE_SCOPE',
   ERROR = 'ERROR'
 }
