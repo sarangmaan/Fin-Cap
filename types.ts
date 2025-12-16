@@ -1,4 +1,5 @@
 
+
 export interface ChartDataPoint {
   label: string;
   value: number;
@@ -14,11 +15,19 @@ export interface BubbleAudit {
   speculativeActivity: 'Low' | 'Moderate' | 'High' | 'Extreme';
 }
 
+export interface WhistleblowerData {
+  integrityScore: number; // 0-100 (100 = Clean, 0 = High Fraud Risk)
+  verdict: 'Clean' | 'Suspicious' | 'High Risk' | 'Manipulation Detected';
+  anomalies: string[]; // List of specific contradictions found
+  insiderActivity: string; // "CEO dumping shares" vs "Net buying"
+  accountingFlags: string; // "Revenue up, Cash flow down" etc.
+}
+
 export interface StructuredAnalysisData {
   riskScore: number; // 0-100
   riskLevel: 'Low' | 'Moderate' | 'High' | 'Critical';
   bubbleProbability: number; // 0-100
-  marketSentiment: 'Bullish' | 'Bearish' | 'Neutral';
+  marketSentiment: 'Bullish' | 'Bearish' | 'Neutral' | 'Euphoric';
   keyMetrics: { label: string; value: string }[];
   trendData: ChartDataPoint[];
   warningSignals?: string[];
@@ -30,6 +39,8 @@ export interface StructuredAnalysisData {
   };
   // Specific Bubble Audit for the searched asset
   bubbleAudit?: BubbleAudit;
+  // New Whistleblower / Forensic Data
+  whistleblower?: WhistleblowerData;
   // New field for Bubble Scope view
   topBubbleAssets?: {
     name: string;

@@ -21,21 +21,22 @@ export const analyzeMarket = async (query: string, onUpdate?: StreamUpdate): Pro
     1. If the query is a specific PUBLIC COMPANY (e.g., Apple, TSLA):
        - SEARCH for Real-Time Price, Today's Change %, Market Cap, and P/E Ratio.
        - SEARCH for recent analyst upgrades/downgrades and major news.
+       - **FORENSIC SCAN**: Search for "Insider selling [Company Name] last 3 months", "Short seller reports [Company Name]", and "Accounting irregularities [Company Name]".
        
     2. If the query is a SECTOR, MARKET, or ECONOMIC TOPIC (e.g., "AI Bubble", "Housing Market", "Crypto"):
-       - SEARCH for major indices performance (e.g., Nasdaq AI index, Case-Shiller).
-       - SEARCH for macro indicators, recent news, and sentiment reports.
+       - SEARCH for major indices performance.
+       - SEARCH for contradictory data (e.g., "Jobs report vs. Reality").
     
-    3. Analyze the gathered data to determine risks and opportunities.
+    3. Analyze the gathered data to determine risks, opportunities, AND hidden anomalies.
     
     4. ESTIMATE recent price action to generate a trend chart (trendData) if exact historical CSV data is unavailable.
   `;
   
   const systemInstruction = `
-    You are a Senior Financial Analyst & Risk Manager.
+    You are a Senior Financial Analyst & Forensic Accountant (The "Whistleblower").
     
     **OBJECTIVE**: 
-    Use Google Search to find real-time market data, then analyze it.
+    Provide a standard financial report but ALSO act as a "Digital Lie Detector". You must flag contradictions (e.g., Stock price rising while Insiders are dumping shares).
     
     **REPORT STRUCTURE (Markdown)**:
     1. **Executive Summary**: 
@@ -49,8 +50,8 @@ export const analyzeMarket = async (query: string, onUpdate?: StreamUpdate): Pro
         - Format strictly as: [[[BUY]]] or [[[SELL]]] or [[[HOLD]]] or [[[CAUTION]]]
 
     **IMPORTANT CONSTRAINTS**:
-    - **DO NOT** write a "SWOT Analysis" section in the Markdown text. The SWOT data must ONLY be provided in the JSON block to avoid visual duplication.
-    - Keep the Markdown concise and actionable.
+    - **DO NOT** write a "SWOT Analysis" section in the Markdown text. Use JSON.
+    - **DO NOT** write a "Whistleblower" section in the Markdown text. Use JSON.
 
     **DATA STRUCTURE (JSON)**:
     Generate a valid JSON block at the very end of your response inside \`\`\`json code fences.
@@ -61,7 +62,7 @@ export const analyzeMarket = async (query: string, onUpdate?: StreamUpdate): Pro
       "marketSentiment": "Bullish" | "Bearish" | "Neutral",
       "keyMetrics": [ { "label": "Price", "value": "$..." } ],
       "trendData": [ 
-        // MANDATORY: Generate exactly 15 data points representing the last 30 days of price action.
+        // MANDATORY: Generate exactly 15 data points representing the last 30 days.
         { "label": "01-01", "value": 145.20, "ma50": 142.50, "rsi": 55 },
         { "label": "01-02", "value": 147.10, "ma50": 143.00, "rsi": 58 }
       ], 
@@ -73,6 +74,13 @@ export const analyzeMarket = async (query: string, onUpdate?: StreamUpdate): Pro
         "fundamentalDivergence": "Brief sentence explaining if price is ahead of earnings/revenue.",
         "peerComparison": "Brief sentence comparing P/E or valuation to sector peers.",
         "speculativeActivity": "Low" | "Moderate" | "High" | "Extreme"
+      },
+      "whistleblower": {
+        "integrityScore": number (0-100, where 100 is Clean/Trustworthy and 0 is Fraud/High Risk),
+        "verdict": "Clean" | "Suspicious" | "High Risk" | "Manipulation Detected",
+        "anomalies": [ "CEO sold $50M stock before bad news", "Revenue up but Cash Flow negative" ],
+        "insiderActivity": "Brief summary of insider buying/selling trends.",
+        "accountingFlags": "Brief note on any accounting gimmicks or 'adjusted' EBITDA concerns."
       }
     }
   `;

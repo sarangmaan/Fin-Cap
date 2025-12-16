@@ -12,6 +12,13 @@ export default defineConfig(({ mode }) => {
     server: {
       host: true, // Listen on all addresses
       allowedHosts: true, // Allow the Render URL to access the server
+      proxy: {
+        '/api': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          secure: false,
+        },
+      },
     },
   };
 });
