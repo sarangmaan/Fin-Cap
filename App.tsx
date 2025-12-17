@@ -61,7 +61,23 @@ const App: React.FC = () => {
       
     } catch (err: any) {
       console.error("Search Analysis Failed:", err);
-      setError(err.message || 'Something went wrong.');
+      let msg = err.message || 'Something went wrong.';
+      
+      // Clean up JSON error messages from API
+      if (msg.includes('{')) {
+         try {
+             // Try to find the inner message if it's nested JSON
+             const match = msg.match(/"message":\s*"([^"]+)"/);
+             if (match && match[1]) {
+                 msg = match[1];
+             }
+         } catch (e) {}
+      }
+      if (msg.includes('503') || msg.includes('overloaded')) {
+          msg = "Server is experiencing high traffic. Please try again in a moment.";
+      }
+
+      setError(msg);
       setView(ViewState.ERROR);
     } finally {
       setLoading(false);
@@ -107,7 +123,11 @@ const App: React.FC = () => {
 
     } catch (err: any) {
       console.error("Analysis Failed:", err);
-      setError(err.message || 'Portfolio analysis failed.');
+      let msg = err.message || 'Portfolio analysis failed.';
+       if (msg.includes('503') || msg.includes('overloaded')) {
+          msg = "Server is experiencing high traffic. Please try again in a moment.";
+      }
+      setError(msg);
       setView(ViewState.ERROR);
     } finally {
       setLoading(false);
@@ -132,7 +152,11 @@ const App: React.FC = () => {
           });
       } catch (err: any) {
           console.error("Bubble Scope Failed:", err);
-          setError(err.message || 'Bubble Scope analysis failed.');
+          let msg = err.message || 'Bubble Scope analysis failed.';
+          if (msg.includes('503') || msg.includes('overloaded')) {
+              msg = "Server is experiencing high traffic. Please try again in a moment.";
+          }
+          setError(msg);
           setView(ViewState.ERROR);
       } finally {
           setLoading(false);

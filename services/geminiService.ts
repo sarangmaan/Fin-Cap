@@ -164,84 +164,106 @@ export const analyzeBubbles = async (onUpdate?: StreamUpdate): Promise<AnalysisR
     return await executeGeminiRequest(prompt, systemInstruction, onUpdate);
   };
 
-// Common execution logic
+// Helper for delay
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Common execution logic with Retry
 async function executeGeminiRequest(prompt: string, systemInstruction: string, onUpdate?: StreamUpdate): Promise<AnalysisResult> {
-  try {
-    const result = await ai.models.generateContentStream({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        systemInstruction: systemInstruction,
-        tools: [{ googleSearch: {} }],
-      },
-    });
+  let attempt = 0;
+  const maxRetries = 3;
+  let backoff = 2000; // Start with 2 seconds
 
-    let fullText = "";
-    let groundingChunks: any[] = [];
-    let hasSentInitialUpdate = false;
+  while (attempt <= maxRetries) {
+    try {
+      const result = await ai.models.generateContentStream({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          systemInstruction: systemInstruction,
+          tools: [{ googleSearch: {} }],
+        },
+      });
 
-    // Iterate through the stream
-    for await (const chunk of result) {
-      if (chunk.text) {
-        fullText += chunk.text;
-        
-        // Stream text update to UI immediately
+      let fullText = "";
+      let groundingChunks: any[] = [];
+      
+      // Iterate through the stream
+      for await (const chunk of result) {
+        if (chunk.text) {
+          fullText += chunk.text;
+          
+          if (onUpdate) {
+              onUpdate({ 
+                  markdownReport: fullText,
+                  isEstimated: false
+              });
+          }
+        }
+        const metadata = chunk.candidates?.[0]?.groundingMetadata;
+        if (metadata?.groundingChunks) {
+          groundingChunks.push(...metadata.groundingChunks);
+        }
+      }
+
+      // Process the final result
+      let structuredData: any | undefined;
+      const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
+      
+      // Clean the markdown report by removing the JSON block
+      const cleanReport = fullText.replace(codeBlockRegex, (match, group1) => {
+          if (!structuredData) {
+              try {
+                  const potentialData = JSON.parse(group1);
+                  if (potentialData.riskScore !== undefined) {
+                      structuredData = potentialData;
+                      return ""; // Remove the JSON block from the visible report
+                  }
+              } catch (e) {}
+          }
+          return match; 
+      }).trim();
+
+      // Filter duplicate sources
+      const uniqueSources = [];
+      const seenUris = new Set();
+      for (const g of groundingChunks) {
+          if (g.web?.uri && !seenUris.has(g.web.uri)) {
+              seenUris.add(g.web.uri);
+              uniqueSources.push(g);
+          }
+      }
+
+      const finalResult = {
+        markdownReport: cleanReport || "Analysis generated.",
+        structuredData,
+        groundingChunks: uniqueSources,
+        isEstimated: false
+      };
+
+      if (onUpdate) onUpdate(finalResult);
+      return finalResult;
+
+    } catch (error: any) {
+      console.error(`Gemini API Error (Attempt ${attempt + 1}):`, error);
+      
+      // Check for 503 or overload errors
+      const isOverloaded = error.message?.includes('503') || error.message?.includes('overloaded') || error.status === 503;
+      
+      if (isOverloaded && attempt < maxRetries) {
+        console.warn(`Model overloaded. Retrying in ${backoff}ms...`);
         if (onUpdate) {
-            onUpdate({ 
-                markdownReport: fullText,
-                isEstimated: false
-            });
-            hasSentInitialUpdate = true;
+            onUpdate({ markdownReport: `*Server is currently busy. Retrying analysis (Attempt ${attempt + 2}/${maxRetries + 1})...*` });
         }
+        await delay(backoff);
+        backoff *= 2; // Exponential backoff
+        attempt++;
+        continue;
       }
-      const metadata = chunk.candidates?.[0]?.groundingMetadata;
-      if (metadata?.groundingChunks) {
-        groundingChunks.push(...metadata.groundingChunks);
-      }
+      
+      // If we're out of retries or it's a different error
+      throw new Error(error.message || "Failed to contact Gemini API.");
     }
-
-    // Process the final result
-    let structuredData: any | undefined;
-    const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
-    
-    // Clean the markdown report by removing the JSON block
-    const cleanReport = fullText.replace(codeBlockRegex, (match, group1) => {
-        if (!structuredData) {
-            try {
-                const potentialData = JSON.parse(group1);
-                if (potentialData.riskScore !== undefined) {
-                    structuredData = potentialData;
-                    return ""; // Remove the JSON block from the visible report
-                }
-            } catch (e) {}
-        }
-        return match; 
-    }).trim();
-
-    // Filter duplicate sources
-    const uniqueSources = [];
-    const seenUris = new Set();
-    for (const g of groundingChunks) {
-        if (g.web?.uri && !seenUris.has(g.web.uri)) {
-            seenUris.add(g.web.uri);
-            uniqueSources.push(g);
-        }
-    }
-
-    const finalResult = {
-      markdownReport: cleanReport || "Analysis generated, but format was unexpected.",
-      structuredData,
-      groundingChunks: uniqueSources,
-      isEstimated: false
-    };
-
-    // Final update with everything
-    if (onUpdate) onUpdate(finalResult);
-
-    return finalResult;
-
-  } catch (error: any) {
-    console.error("Gemini API Error:", error);
-    throw new Error(error.message || "Failed to contact Gemini API.");
   }
+  
+  throw new Error("Service unavailable. Please try again later.");
 }
