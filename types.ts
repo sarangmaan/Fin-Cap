@@ -32,6 +32,7 @@ export interface StructuredAnalysisData {
   marketSentiment: 'Bullish' | 'Bearish' | 'Neutral' | 'Euphoric';
   keyMetrics: { label: string; value: string }[];
   trendData: ChartDataPoint[];
+  technicalAnalysis?: string; // Detailed momentum commentary
   warningSignals?: string[];
   swot?: {
     strengths: string[];

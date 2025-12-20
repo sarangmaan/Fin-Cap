@@ -29,7 +29,7 @@ const RiskGauge: React.FC<RiskGaugeProps> = ({ score, label, type = 'risk' }) =>
   const offset = circumference - (score / 100) * circumference;
 
   return (
-    <div className="flex flex-col items-center justify-center p-6 bg-slate-800/50 rounded-xl border border-slate-700 backdrop-blur-sm">
+    <div className="glass-card p-6 rounded-xl flex flex-col items-center justify-center">
       <div className="relative w-32 h-32 mb-4">
         {/* Background Circle */}
         <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
@@ -56,12 +56,12 @@ const RiskGauge: React.FC<RiskGaugeProps> = ({ score, label, type = 'risk' }) =>
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center flex-col">
-          <span className={`text-3xl font-bold ${themeColor.split(' ')[0]}`}>{score}</span>
-          <span className="text-xs text-slate-400 uppercase tracking-wider">/ 100</span>
+          <span className={`text-4xl font-black ${themeColor.split(' ')[0]}`}>{score}</span>
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">/ 100</span>
         </div>
       </div>
-      <h3 className="text-xl font-bold text-white">{label}</h3>
-      <div className={`mt-2 px-3 py-1 rounded-full text-xs font-bold ${barColor} text-slate-900`}>
+      <h3 className="text-sm font-extrabold text-white uppercase tracking-wider text-center">{label}</h3>
+      <div className={`mt-3 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${barColor} text-slate-900`}>
         {score < 30 ? 'SAFE' : score < 70 ? 'CAUTION' : 'DANGER'}
       </div>
     </div>

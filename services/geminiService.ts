@@ -14,14 +14,15 @@ export const analyzeMarket = async (query: string, onUpdate?: StreamUpdate): Pro
   if (!apiKey) throw new Error("API Key is missing. Please add 'API_KEY' to your Render Environment Variables and Redeploy.");
 
   const prompt = `
-    Perform a financial analysis for: "${query}".
+    Perform a deep-dive financial analysis for: "${query}".
     
     TASK:
     1. If the query is a specific PUBLIC COMPANY (e.g., Apple, TSLA):
        - SEARCH for Real-Time Price, Today's Change %, Market Cap, and P/E Ratio.
+       - SEARCH for **Technical Indicators**: RSI, MACD status, Moving Averages (50/200 DMA status).
        - SEARCH for recent analyst upgrades/downgrades and major news.
        - **FORENSIC SCAN**: Deeply investigate:
-          - "Insider selling [Company Name] last 6 months"
+          - "Insider selling [Company Name] last 6 months" (Look for specific names/amounts)
           - "Short seller reports [Company Name]"
           - "Litigation [Company Name] 2024"
           - "Auditor changes or accounting concerns [Company Name]"
@@ -64,20 +65,30 @@ export const analyzeMarket = async (query: string, onUpdate?: StreamUpdate): Pro
       "marketSentiment": "Bullish" | "Bearish" | "Neutral",
       "keyMetrics": [ { "label": "Price", "value": "$..." } ],
       "trendData": [ { "label": "01-01", "value": 100, "ma50": 95, "rsi": 50 } ], 
+      "technicalAnalysis": "A 2-3 sentence summary of the technical setup (e.g., 'Stock is forming a double top pattern with RSI divergence at 75. 50 DMA support broken...').",
       "warningSignals": [ "Signal 1" ],
-      "swot": { "strengths": [], "weaknesses": [], "opportunities": [], "threats": [] },
+      "swot": { 
+        "strengths": ["Specific point 1", "Specific point 2", "Specific point 3"], 
+        "weaknesses": ["Specific point 1", "Specific point 2", "Specific point 3"], 
+        "opportunities": ["Specific point 1", "Specific point 2", "Specific point 3"], 
+        "threats": ["Specific point 1", "Specific point 2", "Specific point 3"] 
+      },
       "bubbleAudit": {
         "valuationVerdict": "Undervalued" | "Fair Value" | "Overvalued" | "Bubble Territory",
         "score": number,
-        "fundamentalDivergence": "...",
-        "peerComparison": "...",
+        "fundamentalDivergence": "Explain specifically e.g. 'P/E is 50x while growth slowed to 5%...'",
+        "peerComparison": "Compare specifically to 2-3 competitors.",
         "speculativeActivity": "Low" | "Moderate" | "High" | "Extreme"
       },
       "whistleblower": {
         "integrityScore": number,
         "verdict": "Clean" | "Suspicious" | "High Risk" | "Manipulation Detected",
         "forensicVerdict": "A 2-3 sentence summary of the forensic audit results.",
-        "anomalies": [ "Detailed anomaly 1", "Detailed anomaly 2", "Detailed anomaly 3", "Detailed anomaly 4", "Detailed anomaly 5" ],
+        "anomalies": [ 
+           "Detailed anomaly 1 (e.g. CEO selling 50% of holdings ahead of earnings)", 
+           "Detailed anomaly 2 (e.g. Inventory rising 3x faster than sales)", 
+           "Detailed anomaly 3 (e.g. Sudden resignation of CFO)" 
+        ],
         "insiderActivity": "A comprehensive paragraph on recent insider trades, share buybacks, or share dilution.",
         "accountingFlags": "A detailed look at the quality of earnings, cash flow vs net income, and Capex trends.",
         "networkAnalysis": "Analyze the company's relationships, major shareholders, and any opaque subsidiary structures or joint ventures.",

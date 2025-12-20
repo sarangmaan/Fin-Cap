@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Search } from 'lucide-react';
+import { Search, Command } from 'lucide-react';
 import { stocks } from '../data/stocks';
 
 interface SearchBarProps {
@@ -14,6 +14,7 @@ interface SearchBarProps {
 const SearchBar: React.FC<SearchBarProps> = ({ query, setQuery, onSearch, loading, className }) => {
   const [suggestions, setSuggestions] = useState<typeof stocks>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
   
   const inputRef = useRef<HTMLInputElement>(null);
@@ -83,63 +84,74 @@ const SearchBar: React.FC<SearchBarProps> = ({ query, setQuery, onSearch, loadin
   };
 
   return (
-    <div ref={containerRef} className={`relative w-full ${className} overflow-visible`}>
-      {/* Glowing Gradient Border Wrapper */}
-      <div className="p-[4px] rounded-xl bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 shadow-[0_0_30px_-5px_rgba(34,211,238,0.6)]">
-        <form onSubmit={handleSubmit} className="relative flex z-50 bg-[#1e293b] rounded-[10px]">
+    <div ref={containerRef} className={`relative w-full ${className} group`}>
+      {/* 
+        PREMIUM SEARCH INPUT 
+        Gradient border is achieved via a background on the parent div and a slightly smaller inner bg.
+      */}
+      <div 
+        className={`relative rounded-xl p-[1px] transition-all duration-500 ${
+          isFocused 
+            ? 'bg-gradient-to-r from-indigo-500 via-cyan-400 to-indigo-500 shadow-[0_0_20px_rgba(34,211,238,0.3)]' 
+            : 'bg-slate-700 hover:bg-slate-600'
+        }`}
+      >
+        <form onSubmit={handleSubmit} className="relative flex bg-[#0f172a] rounded-[11px] overflow-hidden">
+           <div className="pl-5 flex items-center justify-center text-slate-500">
+              {loading ? <div className="animate-spin h-5 w-5 border-2 border-slate-500 border-t-transparent rounded-full"/> : <Search className={`w-5 h-5 transition-colors ${isFocused ? 'text-cyan-400' : 'text-slate-500'}`} />}
+           </div>
           <input 
             ref={inputRef}
             type="text" 
             value={query}
             onChange={handleInputChange}
-            onFocus={() => { if(query.length > 0) setShowSuggestions(true); }}
-            placeholder="Analyze a stock (e.g., TSLA), sector (e.g., AI), or market..."
-            className="w-full bg-transparent text-white placeholder-slate-400 border-none rounded-[10px] py-4 pl-6 pr-14 focus:outline-none focus:ring-0 text-lg transition-all"
+            onFocus={() => { setIsFocused(true); if(query.length > 0) setShowSuggestions(true); }}
+            onBlur={() => setIsFocused(false)}
+            placeholder="Search ticker, sector, or market topic..."
+            className="w-full bg-transparent text-white placeholder-slate-500 border-none py-4 px-4 focus:outline-none focus:ring-0 text-lg font-medium tracking-wide"
             disabled={loading}
           />
-          <button 
-            type="submit"
-            disabled={loading}
-            className="absolute right-2 top-2 bottom-2 bg-sky-600 hover:bg-sky-500 text-white p-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Search className="w-6 h-6" />
-          </button>
+          <div className="pr-4 flex items-center">
+             <button 
+                type="submit"
+                className={`flex items-center justify-center p-2 rounded-lg border transition-all duration-200 ${isFocused ? 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20' : 'text-slate-500 border-slate-800 bg-slate-900 hover:text-white hover:bg-slate-800'}`}
+             >
+                <Search className="w-4 h-4" />
+             </button>
+          </div>
         </form>
       </div>
 
       {/* PORTALED DROPDOWN */}
       {showSuggestions && suggestions.length > 0 && createPortal(
         <div 
-          className="fixed bg-slate-900 border-2 border-slate-700 rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.9)] overflow-hidden max-h-96 overflow-y-auto ring-1 ring-sky-500/20 isolate pointer-events-auto"
+          className="fixed bg-[#0f172a]/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-96 overflow-y-auto ring-1 ring-white/5 isolate pointer-events-auto no-scrollbar"
           style={{ 
-            top: `${dropdownPos.top + 12}px`, 
+            top: `${dropdownPos.top + 8}px`, 
             left: `${dropdownPos.left}px`, 
             width: `${dropdownPos.width}px`,
             zIndex: 9999,
-            isolation: 'isolate'
           }}
         >
           {suggestions.map((stock) => (
             <div 
               key={stock.symbol}
-              className="px-6 py-4 hover:bg-slate-800 cursor-pointer flex justify-between items-center transition-all border-b border-slate-800 last:border-0 group/item relative overflow-hidden active:bg-slate-700 pointer-events-auto"
+              className="px-5 py-3 hover:bg-white/5 cursor-pointer flex justify-between items-center transition-colors border-b border-white/5 last:border-0 group/item"
               onMouseDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 handleSelectSuggestion(stock);
               }}
             >
-              <div className="flex flex-col items-start gap-1 relative z-10 pointer-events-none">
-                <span className="font-black text-sky-400 text-lg group-hover/item:text-white group-hover/item:translate-x-1 transition-all">
+              <div className="flex flex-col">
+                <span className="font-bold text-white text-base group-hover/item:text-cyan-400 transition-colors">
                   {stock.symbol}
                 </span>
-                <span className="text-sm text-slate-400 font-bold group-hover/item:text-slate-200">{stock.name}</span>
+                <span className="text-xs text-slate-500 font-medium">{stock.name}</span>
               </div>
-              <div className="flex items-center gap-2 relative z-10 pointer-events-none">
-                <span className="text-[10px] font-mono font-black text-slate-300 bg-slate-800 border border-slate-700 px-3 py-1 rounded-full uppercase tracking-widest group-hover/item:bg-sky-900/50 group-hover/item:border-sky-500/50">
+              <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded uppercase">
                   {stock.exchange}
-                </span>
-              </div>
+              </span>
             </div>
           ))}
         </div>,

@@ -20,12 +20,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
       
       body {
         font-family: 'Inter', sans-serif;
         background-color: #0f172a; /* Slate 900 */
         color: #e2e8f0; /* Slate 200 */
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
       }
       
       .font-mono {
@@ -38,72 +40,68 @@
         height: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #1e293b; 
+        background: #0f172a; 
       }
       ::-webkit-scrollbar-thumb {
-        background: #475569; 
+        background: #334155; 
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #64748b; 
+        background: #475569; 
       }
 
-      /* PDF Generation Helpers */
-      .pdf-only { display: none !important; }
+      /* --- PREMIUM FINTECH TERMINAL STYLES --- */
+
+      /* Film Grain Overlay */
+      .bg-grain {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        opacity: 0.035;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+      }
+
+      /* Glassmorphic Card */
+      .glass-card {
+        background: rgba(30, 41, 59, 0.7);
+        backdrop-filter: blur(12px) saturate(180%);
+        -webkit-backdrop-filter: blur(12px) saturate(180%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
       
-      .pdf-page-break {
-        page-break-before: always !important;
-        break-before: page !important;
+      .glass-card:hover {
+        transform: translateY(-4px);
+        border-color: rgba(255, 255, 255, 0.15);
+        box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.6);
       }
 
-      .pdf-section {
-        page-break-inside: avoid !important;
+      /* Institutional Typography */
+      h1, h2, h3, h4, h5, h6 {
+        letter-spacing: -0.02em;
       }
 
-      /* Target the element during html2pdf capture */
-      .html2pdf__container {
-        font-family: 'Inter', sans-serif !important;
-      }
-
+      /* PDF Helpers */
+      .pdf-only { display: none !important; }
+      .pdf-page-break { page-break-before: always !important; }
+      .html2pdf__container { font-family: 'Inter', sans-serif !important; }
+      
       @media print {
         .no-print { display: none !important; }
         .pdf-only { display: block !important; }
-        
-        /* Force high contrast for dark background printing */
-        body {
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
-
-        .pdf-page-break {
-          page-break-before: always !important;
-          break-before: page !important;
-        }
-
-        .pdf-section {
-          page-break-inside: avoid !important;
-        }
+        body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       }
-
-      /* Fix for Recharts in PDF exports */
-      .recharts-responsive-container {
-        min-width: 0;
-      }
-
+      
+      .recharts-responsive-container { min-width: 0; }
+      
       @keyframes pulse-slow {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.7; }
       }
       .animate-pulse-slow {
         animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-      }
-
-      /* Layout improvements for the PDF container */
-      .pdf-export-container {
-        width: 800px;
-        padding: 40px;
-        background-color: #0f172a;
-        margin: 0 auto;
       }
     </style>
 <script type="importmap">

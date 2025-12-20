@@ -4,13 +4,16 @@ import MarkdownRenderer from './MarkdownRenderer';
 import RiskGauge from './RiskGauge';
 import RealityChat from './RealityChat';
 import { 
-  ComposedChart, 
+  ComposedChart,
+  LineChart,
   Line, 
   Area, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
-  ResponsiveContainer 
+  ResponsiveContainer,
+  Tooltip,
+  ReferenceLine
 } from 'recharts';
 import { 
   AlertTriangle, 
@@ -48,34 +51,37 @@ const SwotCard: React.FC<{ title: string; items: string[]; type: 'strength' | 'w
   let icon = null;
   const isLight = mode === 'light';
 
+  // Institutional styling for dark mode
+  const baseDark = "glass-card border-l-4"; 
+  
   switch (type) {
     case 'strength':
-      styles = isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-emerald-900/10 border-emerald-500/30 text-emerald-100';
-      icon = <Zap className={`w-5 h-5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />;
+      styles = isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : `${baseDark} border-l-emerald-500`;
+      icon = <Zap className={`w-4 h-4 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />;
       break;
     case 'weakness':
-      styles = isLight ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-amber-900/10 border-amber-500/30 text-amber-100';
-      icon = <MinusCircle className={`w-5 h-5 ${isLight ? 'text-amber-600' : 'text-amber-400'}`} />;
+      styles = isLight ? 'bg-amber-50 border-amber-200 text-amber-900' : `${baseDark} border-l-amber-500`;
+      icon = <MinusCircle className={`w-4 h-4 ${isLight ? 'text-amber-600' : 'text-amber-400'}`} />;
       break;
     case 'opportunity':
-      styles = isLight ? 'bg-sky-50 border-sky-200 text-sky-900' : 'bg-sky-900/10 border-sky-500/30 text-sky-100';
-      icon = <Target className={`w-5 h-5 ${isLight ? 'text-sky-600' : 'text-sky-400'}`} />;
+      styles = isLight ? 'bg-sky-50 border-sky-200 text-sky-900' : `${baseDark} border-l-sky-500`;
+      icon = <Target className={`w-4 h-4 ${isLight ? 'text-sky-600' : 'text-sky-400'}`} />;
       break;
     case 'threat':
-      styles = isLight ? 'bg-rose-50 border-rose-200 text-rose-900' : 'bg-rose-900/10 border-rose-500/30 text-rose-100';
-      icon = <AlertOctagon className={`w-5 h-5 ${isLight ? 'text-rose-600' : 'text-rose-400'}`} />;
+      styles = isLight ? 'bg-rose-50 border-rose-200 text-rose-900' : `${baseDark} border-l-rose-500`;
+      icon = <AlertOctagon className={`w-4 h-4 ${isLight ? 'text-rose-600' : 'text-rose-400'}`} />;
       break;
   }
   return (
-    <div className={`p-5 rounded-xl border ${styles} mb-4 break-inside-avoid`}>
-      <div className={`flex items-center gap-2 mb-3 border-b pb-2 ${isLight ? 'border-black/10' : 'border-white/10'}`}>
+    <div className={`p-6 rounded-xl mb-4 break-inside-avoid ${styles}`}>
+      <div className={`flex items-center gap-2 mb-4 border-b pb-3 ${isLight ? 'border-black/10' : 'border-white/5'}`}>
         {icon}
-        <h4 className="font-bold text-base uppercase tracking-wider">{title}</h4>
+        <h4 className="font-extrabold text-sm uppercase tracking-widest">{title}</h4>
       </div>
-      <ul className="space-y-2">
+      <ul className="space-y-3">
         {items.map((item, idx) => (
-          <li key={idx} className="text-sm flex items-start gap-2 opacity-90">
-            <span className="mt-1.5 w-1 h-1 rounded-full bg-current opacity-60"></span>
+          <li key={idx} className="text-sm flex items-start gap-3 text-slate-300">
+            <span className="mt-1.5 w-1 h-1 rounded-full bg-slate-500 flex-shrink-0"></span>
             <span className="leading-relaxed">{item}</span>
           </li>
         ))}
@@ -86,14 +92,13 @@ const SwotCard: React.FC<{ title: string; items: string[]; type: 'strength' | 'w
 
 const ReportFooter: React.FC<{ mode?: 'dark' | 'light' }> = ({ mode = 'dark' }) => (
   <div className={`flex items-center justify-between border-t mt-12 pt-6 text-[10px] font-mono uppercase tracking-widest ${mode === 'light' ? 'border-slate-300 text-slate-500' : 'border-slate-800 text-slate-500'}`}>
-    <div>FinCap AI | Forensic Grade Financial Analysis</div>
-    <div>Powered by Gemini 3 Pro & Google Search</div>
-    <div>Page Confidential // Institutional Use Only</div>
+    <div>FinCap AI | Institutional Grade</div>
+    <div>Confidence: High</div>
+    <div>Confidential</div>
   </div>
 );
 
-// --- SEPARATE PRINT COMPONENT ---
-// This renders in a fixed overlay purely for PDF generation
+// --- PRINT TEMPLATE (Pure White for PDF) ---
 const PrintTemplate: React.FC<{ data: AnalysisResult; title: string }> = ({ data, title }) => {
     const { structuredData, markdownReport } = data;
     if (!structuredData) return null;
@@ -153,7 +158,7 @@ const PrintTemplate: React.FC<{ data: AnalysisResult; title: string }> = ({ data
                 {structuredData.trendData && (
                     <div className="border border-slate-200 p-6 rounded-xl bg-white mb-8 break-inside-avoid">
                         <h3 className="text-lg font-bold text-slate-800 mb-6 uppercase">Technical Momentum</h3>
-                        <div className="h-64 w-full">
+                        <div className="h-64 w-full mb-6">
                             <ResponsiveContainer width="100%" height="100%">
                                 <ComposedChart data={structuredData.trendData}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -164,6 +169,11 @@ const PrintTemplate: React.FC<{ data: AnalysisResult; title: string }> = ({ data
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </div>
+                        {structuredData.technicalAnalysis && (
+                            <p className="text-sm text-slate-700 leading-relaxed font-medium bg-slate-50 p-4 rounded-lg border border-slate-100">
+                                {structuredData.technicalAnalysis}
+                            </p>
+                        )}
                     </div>
                 )}
 
@@ -189,8 +199,8 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
                      structuredData?.bubbleAudit?.valuationVerdict === 'Overvalued';
 
   const alertBoxClass = isHighRisk 
-    ? 'bg-rose-950/20 border-rose-500/30 shadow-[0_0_20px_rgba(244,63,94,0.1)]' 
-    : 'bg-slate-800/40 border-slate-700/50';
+    ? 'bg-rose-950/20 border-rose-500/30 shadow-[0_0_20px_rgba(244,63,94,0.1)] backdrop-blur-md' 
+    : 'glass-card border-slate-700/50';
     
   const alertIconClass = isHighRisk ? 'text-rose-500' : 'text-yellow-500';
 
@@ -200,7 +210,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
   const wbBg = wbScore < 50 ? 'bg-rose-950/90 border-rose-500/50' : wbScore < 80 ? 'bg-amber-950/90 border-amber-500/50' : 'bg-slate-900/90 border-slate-700/50';
 
   // --------------------------------------------------------
-  // PDF EXPORT LOGIC (Visible Overlay Method)
+  // PDF EXPORT LOGIC
   // --------------------------------------------------------
   useEffect(() => {
     if (isExporting) {
@@ -251,8 +261,6 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
       
       {/* 
          VISIBLE EXPORT OVERLAY
-         This renders the PDF template in a fixed, high z-index container
-         visible to the user (and html2canvas) during the export process.
       */}
       {isExporting && (
          <div className="fixed inset-0 z-[99999] bg-[#0f172a] overflow-auto flex justify-center items-start pt-10">
@@ -260,36 +268,35 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
                  <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
                  <span className="font-bold">Generating PDF...</span>
              </div>
-             {/* The template to capture */}
              <PrintTemplate data={data} title={title} />
          </div>
       )}
 
       {/* STANDARD DASHBOARD VIEW */}
-      <div className="mb-10 border-b border-slate-700/50 pb-8 text-center relative">
+      <div className="mb-10 border-b border-white/5 pb-8 text-center relative">
           <h1 className="text-5xl md:text-6xl font-black text-white tracking-tighter mb-6 uppercase">{title}</h1>
           <div className="flex items-center justify-center gap-3 mb-8 flex-wrap">
               {structuredData?.whistleblower && (
-                  <button onClick={() => setIsWhistleOpen(true)} className={`flex items-center gap-2 px-6 py-3 rounded-xl border transition-all shadow-xl font-bold uppercase tracking-wider text-sm ${isWbWarning ? 'bg-rose-500/10 border-rose-500 text-rose-400 hover:bg-rose-500 hover:text-white animate-pulse' : 'bg-slate-800 border-slate-600 text-slate-300 hover:text-white hover:border-sky-400'}`}>
+                  <button onClick={() => setIsWhistleOpen(true)} className={`flex items-center gap-2 px-6 py-3 rounded-xl border transition-all shadow-xl font-bold uppercase tracking-wider text-xs ${isWbWarning ? 'bg-rose-500/10 border-rose-500 text-rose-400 hover:bg-rose-500 hover:text-white animate-pulse' : 'bg-slate-800 border-slate-600 text-slate-300 hover:text-white hover:border-sky-400'}`}>
                       <WhistleIcon className={`w-4 h-4 ${isWbWarning ? 'text-current' : 'text-sky-400'}`} />
                       Whistleblower
                   </button>
               )}
-              <button onClick={() => setIsRealityChatOpen(!isRealityChatOpen)} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-violet-900/20 border border-violet-500/40 text-violet-300 hover:bg-violet-600 hover:text-white transition-all text-sm font-bold uppercase tracking-wider shadow-xl shadow-violet-900/10">
+              <button onClick={() => setIsRealityChatOpen(!isRealityChatOpen)} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-violet-900/20 border border-violet-500/40 text-violet-300 hover:bg-violet-600 hover:text-white transition-all text-xs font-bold uppercase tracking-wider shadow-xl shadow-violet-900/10">
                 <MessageSquareWarning className="w-4 h-4" />
                 Reality Check
               </button>
               <button 
                   onClick={handleDownloadReport} 
                   disabled={isExporting}
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-sky-900/20 border border-sky-500/40 text-sky-300 hover:bg-sky-600 hover:text-white transition-all text-sm font-bold uppercase tracking-wider shadow-xl shadow-sky-900/10 disabled:opacity-50 disabled:cursor-wait"
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-sky-900/20 border border-sky-500/40 text-sky-300 hover:bg-sky-600 hover:text-white transition-all text-xs font-bold uppercase tracking-wider shadow-xl shadow-sky-900/10 disabled:opacity-50 disabled:cursor-wait"
               >
                   {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                   Export PDF
               </button>
           </div>
           <div className="flex justify-center">
-              <div className="text-[11px] text-slate-500 flex items-center justify-center gap-3 font-mono uppercase tracking-[0.3em] opacity-80 bg-slate-900/50 px-6 py-2 rounded-full border border-slate-800">
+              <div className="text-[10px] text-slate-500 flex items-center justify-center gap-3 font-mono uppercase tracking-[0.3em] opacity-80 bg-slate-900/50 px-6 py-2 rounded-full border border-slate-800">
                   {isStreaming ? (<><Loader2 className="w-3 h-3 animate-spin text-sky-500" /> DECRYPTING MARKET DATA...</>) : (<><span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> LIVE FORENSIC STATUS: ACTIVE</>)}
               </div>
           </div>
@@ -299,20 +306,22 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           <RiskGauge score={structuredData.riskScore} label="Risk Score" type="risk" />
           <RiskGauge score={structuredData.bubbleProbability} label="Bubble Probability" type="bubble" />
-          <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 flex flex-col justify-center backdrop-blur-sm shadow-inner relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-3 opacity-30"><Activity className="w-12 h-12 text-white" /></div>
-            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">Market Sentiment</div>
-            <div className={`text-5xl font-black flex items-center gap-2 drop-shadow-sm ${structuredData.marketSentiment === 'Bullish' ? 'text-emerald-400' : structuredData.marketSentiment === 'Bearish' ? 'text-rose-400' : 'text-yellow-400'}`}>
+          
+          <div className="glass-card p-6 rounded-xl flex flex-col justify-center relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-3 opacity-30 group-hover:opacity-50 transition-opacity"><Activity className="w-12 h-12 text-white" /></div>
+            <div className="text-slate-400 text-xs font-extrabold uppercase tracking-widest mb-3">Market Sentiment</div>
+            <div className={`text-4xl font-black flex items-center gap-2 drop-shadow-sm ${structuredData.marketSentiment === 'Bullish' ? 'text-emerald-400' : structuredData.marketSentiment === 'Bearish' ? 'text-rose-400' : 'text-yellow-400'}`}>
               {structuredData.marketSentiment}
             </div>
           </div>
-          <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 flex flex-col backdrop-blur-sm shadow-inner relative overflow-hidden">
-            <div className="text-white text-base font-bold uppercase tracking-wider mb-4 border-b border-slate-700 pb-2 flex items-center gap-2"><Info className="w-4 h-4 text-sky-400" /> Key Metrics</div>
-            <div className="space-y-4">
+          
+          <div className="glass-card p-6 rounded-xl flex flex-col relative overflow-hidden">
+            <div className="text-white text-xs font-extrabold uppercase tracking-widest mb-4 border-b border-white/5 pb-2 flex items-center gap-2"><Info className="w-4 h-4 text-sky-400" /> Key Metrics</div>
+            <div className="space-y-3">
               {structuredData.keyMetrics.slice(0, 4).map((metric, idx) => (
                 <div key={idx} className="flex justify-between items-center group">
-                  <span className="text-slate-400 text-xs font-bold uppercase">{metric.label}</span>
-                  <span className="font-mono text-sky-400 font-bold group-hover:text-white transition-colors">{metric.value}</span>
+                  <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">{metric.label}</span>
+                  <span className="font-mono text-sky-400 font-bold text-sm group-hover:text-white transition-colors">{metric.value}</span>
                 </div>
               ))}
             </div>
@@ -333,16 +342,16 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
-        <div className="lg:col-span-8 bg-slate-800/40 p-10 rounded-3xl border border-slate-700/50 shadow-2xl backdrop-blur-sm min-h-[600px]">
-          <div className="flex items-center gap-4 mb-8 border-b border-slate-700 pb-6"><ShieldCheck className="w-8 h-8 text-sky-400" /><h2 className="text-3xl font-black text-white uppercase tracking-tight">Analyst Report</h2></div>
+        <div className="lg:col-span-8 glass-card p-10 rounded-3xl min-h-[600px]">
+          <div className="flex items-center gap-4 mb-8 border-b border-white/5 pb-6"><ShieldCheck className="w-8 h-8 text-sky-400" /><h2 className="text-3xl font-black text-white uppercase tracking-tight">Analyst Report</h2></div>
           <MarkdownRenderer content={markdownReport} />
           
           {groundingChunks && groundingChunks.length > 0 && (
-            <div className="mt-16 pt-8 border-t border-slate-700">
+            <div className="mt-16 pt-8 border-t border-white/5">
                 <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Institutional Citations & Reference Links</h4>
                 <div className="flex flex-wrap gap-3">
                   {groundingChunks.map((chunk, i) => (
-                      <a key={i} href={chunk.web?.uri} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-sky-400 hover:bg-slate-800 hover:border-sky-500 transition-all shadow-md group">
+                      <a key={i} href={chunk.web?.uri} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-4 py-2 bg-slate-900/50 border border-slate-700/50 rounded-lg text-xs text-sky-400 hover:bg-slate-800 hover:border-sky-500 transition-all shadow-md group font-medium">
                         <ExternalLink className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" /> {chunk.web?.title || 'External Reference'}
                       </a>
                   ))}
@@ -353,19 +362,58 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
         
         <div className="lg:col-span-4 space-y-8">
           {structuredData?.trendData && (
-            <div className="bg-slate-800/40 p-8 rounded-3xl border border-slate-700/50 shadow-2xl backdrop-blur-sm">
-              <h3 className="text-xl font-black text-white mb-8 flex items-center gap-3 uppercase tracking-tight"><TrendingUp className="w-6 h-6 text-emerald-400" /> Momentum Scan</h3>
-              <div className="h-64 w-full mb-8">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={structuredData.trendData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                    <XAxis dataKey="label" stroke="#64748b" fontSize={10} axisLine={false} tickLine={false} />
-                    <YAxis stroke="#64748b" fontSize={10} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
-                    <Area type="monotone" dataKey="value" stroke="#0ea5e9" fillOpacity={0.15} fill="#0ea5e9" name="Price" />
-                    <Line type="monotone" dataKey="ma50" stroke="#f59e0b" strokeWidth={2} dot={false} name="MA50" strokeDasharray="5 5" />
-                  </ComposedChart>
-                </ResponsiveContainer>
+            <div className="glass-card p-8 rounded-3xl">
+              <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-tight"><TrendingUp className="w-6 h-6 text-emerald-400" /> Momentum Scan</h3>
+              
+              <div className="mb-2">
+                 <div className="flex justify-between items-center mb-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Price Action & MA50</span>
+                 </div>
+                 <div className="h-40 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={structuredData.trendData}>
+                        <defs>
+                          <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                        <YAxis stroke="#64748b" fontSize={10} axisLine={false} tickLine={false} domain={['auto', 'auto']} width={30} />
+                        <Area type="monotone" dataKey="value" stroke="#0ea5e9" fillOpacity={1} fill="url(#colorPrice)" name="Price" isAnimationActive={false} />
+                        <Line type="monotone" dataKey="ma50" stroke="#f59e0b" strokeWidth={2} dot={false} name="MA50" strokeDasharray="5 5" isAnimationActive={false} />
+                        <Tooltip contentStyle={{backgroundColor: '#0f172a', borderColor: '#334155', fontSize: '12px'}} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                 </div>
               </div>
+
+              <div className="mb-6">
+                 <div className="flex justify-between items-center mb-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">RSI (14) Strength</span>
+                 </div>
+                 <div className="h-24 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={structuredData.trendData}>
+                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                         <YAxis stroke="#64748b" fontSize={10} axisLine={false} tickLine={false} domain={[0, 100]} ticks={[30, 70]} width={30} />
+                         <ReferenceLine y={70} stroke="#f43f5e" strokeDasharray="3 3" />
+                         <ReferenceLine y={30} stroke="#10b981" strokeDasharray="3 3" />
+                         <Line type="monotone" dataKey="rsi" stroke="#a855f7" strokeWidth={2} dot={false} isAnimationActive={false} />
+                         <Tooltip contentStyle={{backgroundColor: '#0f172a', borderColor: '#334155', fontSize: '12px'}} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                 </div>
+              </div>
+              
+              {structuredData.technicalAnalysis && (
+                  <div className="border-t border-white/5 pt-4">
+                      <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2">Technical Commentary</h4>
+                      <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                          {structuredData.technicalAnalysis}
+                      </p>
+                  </div>
+              )}
             </div>
           )}
           
@@ -374,8 +422,31 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
               <div className="flex items-center gap-4 mb-6 border-b border-white/10 pb-4"><AlertTriangle className={`w-8 h-8 ${alertIconClass}`} /><h3 className="text-2xl font-black text-white uppercase tracking-tighter">Bubble Warning</h3></div>
               <div className="space-y-6">
                   <div className="flex justify-between items-center py-2 border-b border-white/5"><span className="text-slate-400 font-bold uppercase text-[11px] tracking-widest">Risk Status</span><span className={`font-black tracking-widest text-sm ${isHighRisk ? 'text-rose-400' : 'text-emerald-400'}`}>{isHighRisk ? 'ELEVATED' : 'STABLE'}</span></div>
-                  <div className="flex justify-between items-center py-2"><span className="text-slate-400 font-bold uppercase text-[11px] tracking-widest">Valuation Verdict</span><span className={`font-black tracking-widest text-sm ${isHighRisk ? 'text-rose-400' : 'text-emerald-400'}`}>{structuredData.bubbleAudit?.valuationVerdict?.toUpperCase() || 'UNRATED'}</span></div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/5"><span className="text-slate-400 font-bold uppercase text-[11px] tracking-widest">Valuation Verdict</span><span className={`font-black tracking-widest text-sm ${isHighRisk ? 'text-rose-400' : 'text-emerald-400'}`}>{structuredData.bubbleAudit?.valuationVerdict?.toUpperCase() || 'UNRATED'}</span></div>
+                  
+                  {structuredData.bubbleAudit?.speculativeActivity && (
+                     <div className="flex justify-between items-center py-2"><span className="text-slate-400 font-bold uppercase text-[11px] tracking-widest">Speculative Heat</span><span className="font-mono text-xs text-sky-300 font-bold">{structuredData.bubbleAudit.speculativeActivity}</span></div>
+                  )}
+
                   <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-white/5"><div className={`h-full transition-all duration-1000 ${isHighRisk ? 'bg-gradient-to-r from-rose-600 to-rose-400' : 'bg-emerald-500'}`} style={{ width: `${structuredData.bubbleProbability}%` }} /></div>
+                  
+                  {structuredData.bubbleAudit?.fundamentalDivergence && (
+                      <div className="pt-4 border-t border-white/5">
+                          <span className="text-slate-400 font-bold uppercase text-[10px] tracking-widest block mb-2">Divergence Analysis</span>
+                          <p className="text-xs text-slate-300 leading-relaxed font-medium bg-black/20 p-3 rounded-lg border border-white/5">
+                              {structuredData.bubbleAudit.fundamentalDivergence}
+                          </p>
+                      </div>
+                  )}
+
+                  {structuredData.bubbleAudit?.peerComparison && (
+                      <div className="pt-2">
+                          <span className="text-slate-400 font-bold uppercase text-[10px] tracking-widest block mb-2">Sector Context</span>
+                          <p className="text-xs text-slate-400 leading-relaxed font-medium">
+                              {structuredData.bubbleAudit.peerComparison}
+                          </p>
+                      </div>
+                  )}
               </div>
             </div>
           )}
@@ -390,7 +461,7 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
             <div className={`relative w-full max-w-4xl rounded-3xl border shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col max-h-[90vh] ${wbBg}`}>
                <div className="p-8 border-b border-white/10 flex justify-between items-start">
                   <div className="flex items-center gap-5">
-                     <div className={`p-4 rounded-2xl ${isWbWarning ? 'bg-rose-500/20 border border-rose-500/30' : 'bg-emerald-500/20 border border-emerald-500/30'}`}>
+                     <div className={`p-4 rounded-2xl ${isWbWarning ? 'bg-rose-500/20 border border-rose-500/30' : 'bg-emerald-500/20 border border-emerald-500/20'}`}>
                         <WhistleIcon className={`w-10 h-10 ${wbColor}`} />
                      </div>
                      <div>
@@ -402,9 +473,67 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
                   </button>
                </div>
                <div className="p-8 space-y-8 overflow-y-auto no-scrollbar bg-slate-950/20">
+                     
+                     {/* Risk Scale */}
+                     <div className="bg-black/20 p-6 rounded-2xl border border-white/5 backdrop-blur-sm">
+                        <div className="flex justify-between items-center mb-4">
+                           <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Integrity Assessment Scale</h4>
+                           <div className={`text-2xl font-black ${wbColor} drop-shadow-md`}>
+                              {structuredData.whistleblower.integrityScore} <span className="text-sm text-slate-500 font-bold">/ 100</span>
+                           </div>
+                        </div>
+                        
+                        <div className="relative h-4 bg-slate-800 rounded-full overflow-hidden shadow-inner border border-white/5">
+                           {/* Gradient Bar */}
+                           <div className="absolute inset-0 bg-gradient-to-r from-rose-600 via-amber-500 to-emerald-500 opacity-90" />
+                           {/* Scanlines overlay for effect */}
+                           <div className="absolute inset-0 bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkQAKrVq36zwjjgzhhZWGMYAEYB8RmROaABADeOQ8CXl/xfgAAAABJRU5ErkJggg==')] opacity-20"></div>
+                           
+                           {/* Marker */}
+                           <div 
+                              className="absolute top-0 bottom-0 w-1.5 bg-white shadow-[0_0_15px_rgba(255,255,255,1)] z-10 transition-all duration-1000 transform -translate-x-1/2"
+                              style={{ left: `${structuredData.whistleblower.integrityScore}%` }}
+                           />
+                        </div>
+                        
+                        <div className="flex justify-between mt-2 text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">
+                           <span className="text-rose-500">High Risk</span>
+                           <span className="text-amber-500">Caution</span>
+                           <span className="text-emerald-500">Clean</span>
+                        </div>
+                     </div>
+
                      <p className="mt-6 text-slate-300 text-sm leading-relaxed italic border-l-2 border-sky-500/30 pl-4">
                         "{structuredData.whistleblower.forensicVerdict}"
                      </p>
+                     
+                     {structuredData.whistleblower.anomalies && structuredData.whistleblower.anomalies.length > 0 && (
+                        <div>
+                             <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <AlertTriangle className="w-4 h-4 text-rose-500" /> 
+                                Detected Anomalies & Red Flags
+                             </h4>
+                             <ul className="space-y-3">
+                                {structuredData.whistleblower.anomalies.map((anomaly, idx) => (
+                                    <li key={idx} className="flex items-start gap-3 bg-rose-900/10 border border-rose-500/10 p-4 rounded-xl text-sm text-slate-300">
+                                        <span className="mt-1 w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0"></span>
+                                        <span className="leading-relaxed">{anomaly}</span>
+                                    </li>
+                                ))}
+                             </ul>
+                        </div>
+                     )}
+
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white/5 p-6 rounded-xl border border-white/5">
+                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Insider Activity</h4>
+                            <p className="text-xs text-slate-300 leading-relaxed">{structuredData.whistleblower.insiderActivity}</p>
+                        </div>
+                        <div className="bg-white/5 p-6 rounded-xl border border-white/5">
+                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Accounting Quality</h4>
+                            <p className="text-xs text-slate-300 leading-relaxed">{structuredData.whistleblower.accountingFlags}</p>
+                        </div>
+                     </div>
                </div>
             </div>
          </div>
