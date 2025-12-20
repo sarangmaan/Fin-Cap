@@ -28,7 +28,7 @@ const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 app.post('/api/analyze', async (req, res) => {
   try {
     if (!ai) {
-        return res.status(500).json({ error: "Server missing API Key. Check .env file." });
+        return res.status(500).json({ error: "Server missing API Key. Check environment variables." });
     }
 
     const { portfolioData, data: marketQuery } = req.body;
@@ -64,7 +64,7 @@ app.post('/api/analyze', async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: promptText,
       config: {
         responseMimeType: "application/json"
@@ -97,8 +97,6 @@ app.post('/api/analyze', async (req, res) => {
 });
 
 // --- 2. THE CHATBOT ROUTE (Legacy/Backup) ---
-// Note: The frontend now mostly uses Client-Side SDK to avoid server timeouts, 
-// but we keep this here for compatibility.
 app.post('/api/chat', async (req, res) => {
   try {
     if (!ai) {
@@ -116,7 +114,7 @@ app.post('/api/chat', async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: message,
       config: {
         systemInstruction: systemInstruction,

@@ -1,5 +1,3 @@
-
-
 export interface ChartDataPoint {
   label: string;
   value: number;
@@ -18,9 +16,13 @@ export interface BubbleAudit {
 export interface WhistleblowerData {
   integrityScore: number; // 0-100 (100 = Clean, 0 = High Fraud Risk)
   verdict: 'Clean' | 'Suspicious' | 'High Risk' | 'Manipulation Detected';
+  forensicVerdict: string; // Detailed sentence summary of the forensic audit
   anomalies: string[]; // List of specific contradictions found
   insiderActivity: string; // "CEO dumping shares" vs "Net buying"
   accountingFlags: string; // "Revenue up, Cash flow down" etc.
+  networkAnalysis?: string; // Hidden connections or opaque subsidiary structures
+  regulatoryFriction?: string; // Ongoing investigations or compliance failures
+  sentimentDivergence?: string; // Difference between retail hype and institutional actions
 }
 
 export interface StructuredAnalysisData {
@@ -37,11 +39,8 @@ export interface StructuredAnalysisData {
     opportunities: string[];
     threats: string[];
   };
-  // Specific Bubble Audit for the searched asset
   bubbleAudit?: BubbleAudit;
-  // New Whistleblower / Forensic Data
   whistleblower?: WhistleblowerData;
-  // New field for Bubble Scope view
   topBubbleAssets?: {
     name: string;
     riskScore: number;
@@ -62,7 +61,7 @@ export interface AnalysisResult {
   markdownReport: string;
   structuredData?: StructuredAnalysisData;
   groundingChunks?: GroundingChunk[];
-  isEstimated?: boolean; // New flag to indicate fallback mode
+  isEstimated?: boolean;
 }
 
 export interface PortfolioItem {
@@ -71,7 +70,7 @@ export interface PortfolioItem {
   name: string;
   quantity: number;
   buyPrice: number;
-  currentPrice: number; // Simulated/Fetched
+  currentPrice: number;
 }
 
 export enum ViewState {

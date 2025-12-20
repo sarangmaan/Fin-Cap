@@ -3,35 +3,38 @@ import { CheckCircle2, AlertTriangle, TrendingUp, TrendingDown, Rocket, AlertOct
 
 interface MarkdownRendererProps {
   content: string;
+  mode?: 'dark' | 'light';
 }
 
-const TableRenderer: React.FC<{ rows: string[] }> = ({ rows }) => {
-  // Basic markdown table parser
-  // Assumes row 0 is header, row 1 is divider, row 2+ is data
+const TableRenderer: React.FC<{ rows: string[]; mode: 'dark' | 'light' }> = ({ rows, mode }) => {
   if (rows.length < 2) return null;
 
   const headers = rows[0].split('|').filter(c => c.trim() !== '').map(c => c.trim());
   const dataRows = rows.slice(2).map(r => r.split('|').filter(c => c.trim() !== '').map(c => c.trim()));
 
+  const borderColor = mode === 'light' ? 'border-slate-300' : 'border-slate-700';
+  const headerBg = mode === 'light' ? 'bg-slate-100 text-slate-800' : 'bg-slate-900/80 text-slate-400';
+  const rowHover = mode === 'light' ? 'hover:bg-slate-50' : 'hover:bg-slate-700/30';
+  const cellText = mode === 'light' ? 'text-slate-700' : 'text-slate-300';
+
   return (
-    <div className="overflow-x-auto my-8 border border-slate-700 rounded-lg shadow-lg">
-      <table className="w-full text-sm text-left text-slate-300 border-collapse">
-        <thead className="text-xs text-slate-400 uppercase bg-slate-900/80">
+    <div className={`overflow-x-auto my-8 border ${borderColor} rounded-lg shadow-sm`}>
+      <table className={`w-full text-sm text-left border-collapse ${cellText}`}>
+        <thead className={`text-xs uppercase ${headerBg}`}>
           <tr>
             {headers.map((h, i) => (
-              <th key={i} className="px-6 py-4 font-bold tracking-wider border border-slate-700 bg-slate-900">
-                {h}
+              <th key={i} className={`px-6 py-4 font-bold tracking-wider border ${borderColor}`}>
+                <InlineText text={h} mode={mode} />
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="bg-slate-800/20">
+        <tbody className={mode === 'light' ? 'bg-white' : 'bg-slate-800/20'}>
           {dataRows.map((row, i) => (
-            <tr key={i} className="hover:bg-slate-700/30 transition-colors">
+            <tr key={i} className={`${rowHover} transition-colors`}>
               {row.map((cell, j) => (
-                <td key={j} className="px-6 py-4 whitespace-pre-wrap leading-relaxed border border-slate-700">
-                   {/* Handle bolding inside table cells too */}
-                   <InlineText text={cell} />
+                <td key={j} className={`px-6 py-4 whitespace-pre-wrap leading-relaxed border ${borderColor}`}>
+                   <InlineText text={cell} mode={mode} />
                 </td>
               ))}
             </tr>
@@ -42,55 +45,72 @@ const TableRenderer: React.FC<{ rows: string[] }> = ({ rows }) => {
   );
 };
 
-// Helper component for bold text processing
-const InlineText: React.FC<{ text: string }> = ({ text }) => {
+const InlineText: React.FC<{ text: string; mode: 'dark' | 'light' }> = ({ text, mode }) => {
   if (!text) return null;
-  const parts = text.split(/(\*\*.*?\*\*)/g);
+  
+  const sanitizedText = text.replace(/\[\[\[.*?\]\]\]/g, '').trim();
+  if (!sanitizedText) return null;
+
+  const parts = sanitizedText.split(/(\*\*[\s\S]*?\*\*|__[ \s\S]*?__|\*[\s\S]*?\*|_[\s\S]*?_)/g);
+  
+  const boldClass = mode === 'light' ? 'text-slate-900 font-black' : 'text-white font-black';
+  const italicClass = mode === 'light' ? 'text-slate-600 italic font-medium' : 'text-slate-100 italic font-medium';
+
   return (
     <>
       {parts.map((part, i) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-          return <strong key={i} className="text-white font-semibold">{part.slice(2, -2)}</strong>;
+        if (!part) return null;
+        const trimmed = part.trim();
+        
+        if ((trimmed.startsWith('**') && trimmed.endsWith('**')) || (trimmed.startsWith('__') && trimmed.endsWith('__'))) {
+          const content = trimmed.slice(2, -2).trim();
+          return <strong key={i} className={boldClass}>{content}</strong>;
         }
-        return part;
+        
+        if ((trimmed.startsWith('*') && trimmed.endsWith('*')) || (trimmed.startsWith('_') && trimmed.endsWith('_'))) {
+          const content = trimmed.slice(1, -1).trim();
+          return <em key={i} className={italicClass}>{content}</em>;
+        }
+        
+        return part.replace(/\*\*|__|[*_]/g, '');
       })}
     </>
   );
 };
 
 const VerdictBadge: React.FC<{ verdict: string }> = ({ verdict }) => {
-  const v = verdict.replace(/\[\[\[|\]\]\]/g, '').trim();
+  const match = verdict.match(/\[\[\[(.*?)\]\]\]/);
+  const v = (match ? match[1] : verdict).replace(/\[\[\[|\]\]\]|\*\*|__|[*_]/g, '').trim();
   
+  if (!v) return null;
+
   let styles = 'bg-slate-700 text-white';
   let icon = <CheckCircle2 className="w-6 h-6" />;
 
-  switch(v.toLowerCase()) {
-    case 'strong buy':
-      styles = 'bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.5)] border border-emerald-400';
-      icon = <Rocket className="w-6 h-6" />;
-      break;
-    case 'buy':
-      styles = 'bg-emerald-500/90 text-white border border-emerald-500/50';
-      icon = <TrendingUp className="w-6 h-6" />;
-      break;
-    case 'hold':
-    case 'caution':
-      styles = 'bg-amber-400 text-slate-900 border border-amber-300';
-      icon = <AlertTriangle className="w-6 h-6" />;
-      break;
-    case 'sell':
-      styles = 'bg-rose-500 text-white border border-rose-400';
-      icon = <TrendingDown className="w-6 h-6" />;
-      break;
-    case 'strong sell':
-      styles = 'bg-rose-600 text-white shadow-[0_0_15px_rgba(225,29,72,0.5)] border border-rose-500';
-      icon = <AlertOctagon className="w-6 h-6" />;
-      break;
+  const normalized = v.toLowerCase();
+  if (normalized.includes('strong buy')) {
+    styles = 'bg-emerald-600 text-white shadow-lg border border-emerald-500';
+    icon = <Rocket className="w-6 h-6" />;
+  } else if (normalized.includes('buy')) {
+    styles = 'bg-emerald-500 text-white border border-emerald-400';
+    icon = <TrendingUp className="w-6 h-6" />;
+  } else if (normalized.includes('hold') || normalized.includes('observing')) {
+    styles = 'bg-sky-500 text-white border border-sky-400';
+    icon = <CheckCircle2 className="w-6 h-6" />;
+  } else if (normalized.includes('caution')) {
+    styles = 'bg-amber-500 text-white border border-amber-400';
+    icon = <AlertTriangle className="w-6 h-6" />;
+  } else if (normalized.includes('strong sell')) {
+    styles = 'bg-rose-600 text-white shadow-lg border border-rose-500';
+    icon = <AlertOctagon className="w-6 h-6" />;
+  } else if (normalized.includes('sell')) {
+    styles = 'bg-rose-500 text-white border border-rose-400';
+    icon = <TrendingDown className="w-6 h-6" />;
   }
 
   return (
-    <div className="my-6">
-      <div className={`inline-flex items-center gap-3 px-6 py-3 rounded-xl font-bold text-xl uppercase tracking-widest shadow-lg transform transition-all hover:scale-105 ${styles}`}>
+    <div className="my-8 flex justify-center print:my-4">
+      <div className={`inline-flex items-center gap-4 px-8 py-4 rounded-xl font-black text-xl uppercase tracking-tighter shadow-md ${styles}`}>
         {icon}
         {v}
       </div>
@@ -98,14 +118,23 @@ const VerdictBadge: React.FC<{ verdict: string }> = ({ verdict }) => {
   );
 };
 
-const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
+const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, mode = 'dark' }) => {
   const lines = content.split('\n');
-  const elements: { type: 'text' | 'table' | 'verdict'; content: string | string[] }[] = [];
+  const elements: { type: 'text' | 'table' | 'verdict' | 'header' | 'list' | 'numlist'; level?: number; content: string | string[] }[] = [];
   let tableBuffer: string[] = [];
 
-  // Group lines into tables or text blocks
   lines.forEach((line) => {
-    if (line.trim().startsWith('|')) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+       if (tableBuffer.length > 0) {
+          elements.push({ type: 'table', content: [...tableBuffer] });
+          tableBuffer = [];
+       }
+       elements.push({ type: 'text', content: '' });
+       return;
+    }
+
+    if (trimmed.startsWith('|')) {
       tableBuffer.push(line);
     } else {
       if (tableBuffer.length > 0) {
@@ -113,70 +142,74 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
         tableBuffer = [];
       }
       
-      // Check for Verdict pattern: [[[Verdict]]]
-      if (line.trim().startsWith('[[[') && line.trim().endsWith(']]]')) {
-         elements.push({ type: 'verdict', content: line });
-      } else {
+      const verdictMatch = trimmed.match(/\[\[\[(.*?)\]\]\]/);
+      if (verdictMatch) {
+         elements.push({ type: 'verdict', content: verdictMatch[0] });
+      } 
+      else if (trimmed.match(/^#+\s/)) {
+          const levelMatch = trimmed.match(/^(#+)/);
+          const level = levelMatch ? levelMatch[0].length : 1;
+          elements.push({ type: 'header', level: Math.min(level, 3), content: trimmed.replace(/^#+\s*/, '') });
+      }
+      else if (trimmed.match(/^[-*]\s/)) {
+          elements.push({ type: 'list', content: trimmed.replace(/^[-*]\s*/, '') });
+      }
+      else if (trimmed.match(/^\d+\.\s/)) {
+          elements.push({ type: 'numlist', content: trimmed.replace(/^\d+\.\s*/, '') });
+      }
+      else {
          elements.push({ type: 'text', content: line });
       }
     }
   });
-  // Flush remaining table
+  
   if (tableBuffer.length > 0) {
     elements.push({ type: 'table', content: [...tableBuffer] });
   }
 
+  const textColor = mode === 'light' ? 'text-slate-700' : 'text-slate-300';
+  const headerColor = mode === 'light' ? 'text-slate-900' : 'text-white';
+  const subHeaderColor = mode === 'light' ? 'text-sky-700' : 'text-sky-400';
+  const listBulletColor = mode === 'light' ? 'text-emerald-600' : 'text-emerald-500';
+
   return (
-    <div className="space-y-4 text-slate-300 leading-relaxed">
+    <div className={`space-y-3 leading-relaxed ${textColor}`}>
       {elements.map((el, index) => {
         if (el.type === 'table') {
-          return <TableRenderer key={index} rows={el.content as string[]} />;
+          return <TableRenderer key={index} rows={el.content as string[]} mode={mode} />;
         }
         
         if (el.type === 'verdict') {
            return <VerdictBadge key={index} verdict={el.content as string} />;
         }
 
-        const line = el.content as string;
-        
-        // Headers
-        if (line.startsWith('### ')) {
-          return <h3 key={index} className="text-xl font-bold text-sky-400 mt-8 mb-3">{line.replace('### ', '')}</h3>;
-        }
-        if (line.startsWith('## ')) {
-          return <h2 key={index} className="text-2xl font-bold text-white mt-10 mb-4 border-b border-slate-700 pb-2">{line.replace('## ', '')}</h2>;
-        }
-        if (line.startsWith('# ')) {
-          return <h1 key={index} className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-emerald-400 mb-6">{line.replace('# ', '')}</h1>;
+        if (el.type === 'header') {
+            const content = el.content as string;
+            if (el.level === 1) return <h1 key={index} className={`text-2xl font-black mb-4 mt-8 uppercase tracking-tight ${headerColor}`}><InlineText text={content} mode={mode} /></h1>;
+            if (el.level === 2) return <h2 key={index} className={`text-xl font-bold mt-8 mb-4 border-b pb-2 ${mode === 'light' ? 'border-slate-200' : 'border-slate-700'} ${headerColor}`}><InlineText text={content} mode={mode} /></h2>;
+            return <h3 key={index} className={`text-lg font-bold mt-6 mb-2 ${subHeaderColor}`}><InlineText text={content} mode={mode} /></h3>;
         }
 
-        // Lists
-        if (line.trim().startsWith('- ')) {
-          return (
-            <div key={index} className="flex items-start ml-4 my-1">
-              <span className="text-emerald-500 mr-2 min-w-[10px]">•</span>
-              <span><InlineText text={line.replace('- ', '')} /></span>
-            </div>
-          );
-        }
-        
-        // Numbered Lists
-         if (/^\d+\.\s/.test(line.trim())) {
-             return (
-                 <div key={index} className="flex items-start ml-4 my-1">
-                     <span className="text-sky-500 mr-2 font-mono">{line.trim().split('.')[0]}.</span>
-                     <span><InlineText text={line.replace(/^\d+\.\s/, '')} /></span>
-                 </div>
-             )
-         }
-
-        // Empty lines
-        if (line.trim() === '') {
-          return <div key={index} className="h-2"></div>;
+        if (el.type === 'list') {
+            return (
+                <div key={index} className="flex items-start ml-4 my-1">
+                  <span className={`${listBulletColor} mr-3 font-bold`}>•</span>
+                  <span><InlineText text={el.content as string} mode={mode} /></span>
+                </div>
+            );
         }
 
-        // Paragraphs
-        return <p key={index}><InlineText text={line} /></p>;
+        if (el.type === 'numlist') {
+            return (
+                <div key={index} className="flex items-start ml-4 my-1">
+                  <span className={`${subHeaderColor} mr-3 font-bold`}>{index + 1}.</span>
+                  <span><InlineText text={el.content as string} mode={mode} /></span>
+                </div>
+            );
+        }
+
+        if (el.content === '') return <div key={index} className="h-2"></div>;
+        return <div key={index} className="mb-2"><InlineText text={el.content as string} mode={mode} /></div>;
       })}
     </div>
   );

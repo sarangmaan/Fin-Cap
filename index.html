@@ -18,6 +18,7 @@
       })();
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
       
@@ -46,6 +47,64 @@
       ::-webkit-scrollbar-thumb:hover {
         background: #64748b; 
       }
+
+      /* PDF Generation Helpers */
+      .pdf-only { display: none !important; }
+      
+      .pdf-page-break {
+        page-break-before: always !important;
+        break-before: page !important;
+      }
+
+      .pdf-section {
+        page-break-inside: avoid !important;
+      }
+
+      /* Target the element during html2pdf capture */
+      .html2pdf__container {
+        font-family: 'Inter', sans-serif !important;
+      }
+
+      @media print {
+        .no-print { display: none !important; }
+        .pdf-only { display: block !important; }
+        
+        /* Force high contrast for dark background printing */
+        body {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+
+        .pdf-page-break {
+          page-break-before: always !important;
+          break-before: page !important;
+        }
+
+        .pdf-section {
+          page-break-inside: avoid !important;
+        }
+      }
+
+      /* Fix for Recharts in PDF exports */
+      .recharts-responsive-container {
+        min-width: 0;
+      }
+
+      @keyframes pulse-slow {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+      }
+      .animate-pulse-slow {
+        animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+
+      /* Layout improvements for the PDF container */
+      .pdf-export-container {
+        width: 800px;
+        padding: 40px;
+        background-color: #0f172a;
+        margin: 0 auto;
+      }
     </style>
 <script type="importmap">
 {
@@ -63,7 +122,8 @@
     "dotenv": "https://esm.sh/dotenv@^17.2.3",
     "path": "https://esm.sh/path@^0.12.7",
     "url": "https://esm.sh/url@^0.11.4",
-    "node-fetch": "https://esm.sh/node-fetch@^3.3.2"
+    "node-fetch": "https://esm.sh/node-fetch@^3.3.2",
+    "react-dom": "https://esm.sh/react-dom@^19.2.3"
   }
 }
 </script>
