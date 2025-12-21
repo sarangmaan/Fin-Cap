@@ -126,7 +126,7 @@ async function executeGeminiRequest(prompt: string, systemInstruction: string, o
   while (attempt <= maxRetries) {
     try {
       const result = await ai.models.generateContentStream({
-        model: "gemini-2.0-flash",
+        model: "gemini-1.5-flash",
         contents: prompt,
         config: {
           systemInstruction: systemInstruction,
@@ -182,6 +182,7 @@ async function executeGeminiRequest(prompt: string, systemInstruction: string, o
       return finalResult;
 
     } catch (error: any) {
+      console.error("Gemini Request Error:", error);
       const isOverloaded = error.message?.includes('503') || error.message?.includes('overloaded') || error.status === 503 || error.status === 429;
       if (isOverloaded && attempt < maxRetries) {
         await delay(backoff);
