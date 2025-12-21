@@ -126,7 +126,7 @@ async function executeGeminiRequest(prompt: string, systemInstruction: string, o
   while (attempt <= maxRetries) {
     try {
       const result = await ai.models.generateContentStream({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.0-flash",
         contents: prompt,
         config: {
           systemInstruction: systemInstruction,
