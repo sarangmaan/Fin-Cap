@@ -64,7 +64,7 @@ app.post('/api/analyze', async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: promptText,
       config: {
         responseMimeType: "application/json"
@@ -114,7 +114,7 @@ app.post('/api/chat', async (req, res) => {
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.0-flash",
       contents: message,
       config: {
         systemInstruction: systemInstruction,
