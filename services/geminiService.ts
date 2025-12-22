@@ -125,8 +125,9 @@ async function executeGeminiRequest(prompt: string, systemInstruction: string, o
 
   while (attempt <= maxRetries) {
     try {
+      // Switch to gemini-1.5-flash which is the stable production model with free tier limits
       const result = await ai.models.generateContentStream({
-        model: "gemini-2.0-flash",
+        model: "gemini-1.5-flash",
         contents: prompt,
         config: {
           systemInstruction: systemInstruction,
@@ -184,14 +185,18 @@ async function executeGeminiRequest(prompt: string, systemInstruction: string, o
     } catch (error: any) {
       console.error("Gemini Request Error:", error);
       const isOverloaded = error.message?.includes('503') || error.message?.includes('overloaded') || error.status === 503 || error.status === 429;
+      
+      // If we are hitting rate limits, retry with backoff
       if (isOverloaded && attempt < maxRetries) {
         await delay(backoff);
         backoff *= 2;
         attempt++;
         continue;
       }
+      
+      // If the error persists or is not a rate limit, throw it up
       throw new Error(error.message || "Failed to contact Gemini API.");
     }
   }
-  throw new Error("Service unavailable.");
+  throw new Error("Service unavailable. Rate limits reached.");
 }
