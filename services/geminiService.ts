@@ -13,12 +13,12 @@ const ai = new GoogleGenAI({ apiKey });
 
 type StreamUpdate = (data: Partial<AnalysisResult>) => void;
 
-// 2. FALLBACK MODELS LIST
+// 2. OPTIMIZED MODEL LIST (Best Working Models)
+// Prioritizing Stable 2.0 Flash, then High-Reasoning 1.5 Pro, then High-Availability 1.5 Flash.
 const MODELS_TO_TRY = [
-  "gemini-2.0-flash-exp",
-  "gemini-2.0-flash",
-  "gemini-1.5-flash", 
-  "gemini-1.5-pro-latest"
+  "gemini-2.0-flash",      // Primary: Best balance of speed/intelligence/stability
+  "gemini-1.5-pro",        // Backup 1: High reasoning power (slower but deeper)
+  "gemini-1.5-flash"       // Backup 2: Highest availability/speed
 ];
 
 // --- SIMULATION DATA GENERATOR ---
