@@ -1,7 +1,7 @@
 import { AnalysisResult, PortfolioItem } from "../types";
 import { GoogleGenAI } from "@google/genai";
 
-// 1. HARDCODED FALLBACK KEY
+// 1. HARDCODED KEY (As requested)
 const FALLBACK_KEY = "AIzaSyAX_SmJKiCNoxchff0lOcFBJc7GFceTLoM";
 const apiKey = process.env.API_KEY || FALLBACK_KEY;
 
@@ -13,10 +13,11 @@ const ai = new GoogleGenAI({ apiKey });
 
 type StreamUpdate = (data: Partial<AnalysisResult>) => void;
 
-// 2. OPTIMIZED MODEL LIST (Gemini 2.5 Flash - Supported by SDK 1.33.0)
+// 2. MODEL SELECTION (Strictly 1.5 Flash with variants)
 const MODELS_TO_TRY = [
-  "gemini-2.5-flash-preview",
-  "gemini-flash-latest"
+  "gemini-1.5-flash",
+  "gemini-1.5-flash-001", 
+  "gemini-1.5-flash-latest"
 ];
 
 // --- API FUNCTIONS ---
@@ -37,17 +38,23 @@ export const chatWithGemini = async (
         - Keep it short. Use emojis.
   `;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview",
-      contents: [...history, { role: 'user', parts: [{ text: message }] }],
-      config: { systemInstruction, maxOutputTokens: 300 }
-    });
-    return response.text || "No response generated.";
-  } catch (e: any) {
-    console.warn(`Chat model failed:`, e.message);
-    return "I'm having trouble connecting to the market brain right now. Try again later.";
+  // Try 1.5 versions in order
+  for (const model of MODELS_TO_TRY) {
+    try {
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: [...history, { role: 'user', parts: [{ text: message }] }],
+        config: { systemInstruction, maxOutputTokens: 300 }
+      });
+      return response.text || "No response generated.";
+    } catch (e: any) {
+      console.warn(`Chat model ${model} failed:`, e.message);
+      if (model === MODELS_TO_TRY[MODELS_TO_TRY.length - 1]) {
+         return "I'm having trouble connecting to the market brain right now. Try again later.";
+      }
+    }
   }
+  return "Connection failed.";
 };
 
 export const analyzeMarket = async (query: string, onUpdate?: StreamUpdate): Promise<AnalysisResult> => {
@@ -77,66 +84,74 @@ async function executeGeminiRequest(prompt: string, systemInstruction: string, o
       throw new Error("API Key is missing");
   }
 
-  const modelName = MODELS_TO_TRY[0]; // gemini-2.5-flash-preview
+  let lastError: any;
 
-  try {
-    const result = await ai.models.generateContentStream({
-      model: modelName,
-      contents: prompt,
-      config: {
-        systemInstruction: systemInstruction,
-        tools: [{ googleSearch: {} }],
-      },
-    });
+  // Retry Loop for Model Variants
+  for (const modelName of MODELS_TO_TRY) {
+      try {
+        const result = await ai.models.generateContentStream({
+          model: modelName,
+          contents: prompt,
+          config: {
+            systemInstruction: systemInstruction,
+            tools: [{ googleSearch: {} }],
+          },
+        });
 
-    let fullText = "";
-    let groundingChunks: any[] = [];
-    
-    for await (const chunk of result) {
-      if (chunk.text) {
-        fullText += chunk.text;
-        if (onUpdate) onUpdate({ markdownReport: fullText, isEstimated: false });
+        let fullText = "";
+        let groundingChunks: any[] = [];
+        
+        for await (const chunk of result) {
+          if (chunk.text) {
+            fullText += chunk.text;
+            if (onUpdate) onUpdate({ markdownReport: fullText, isEstimated: false });
+          }
+          const metadata = chunk.candidates?.[0]?.groundingMetadata;
+          if (metadata?.groundingChunks) groundingChunks.push(...metadata.groundingChunks);
+        }
+
+        let structuredData: any | undefined;
+        const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
+        const cleanReport = fullText.replace(codeBlockRegex, (match, group1) => {
+            if (!structuredData) {
+                try {
+                    const potentialData = JSON.parse(group1);
+                    if (potentialData.riskScore !== undefined) {
+                        structuredData = potentialData;
+                        return "";
+                    }
+                } catch (e) {}
+            }
+            return match; 
+        }).trim();
+
+        const uniqueSources = [];
+        const seenUris = new Set();
+        for (const g of groundingChunks) {
+            if (g.web?.uri && !seenUris.has(g.web.uri)) {
+                seenUris.add(g.web.uri);
+                uniqueSources.push(g);
+            }
+        }
+
+        const finalResult = {
+          markdownReport: cleanReport || "Analysis generated.",
+          structuredData,
+          groundingChunks: uniqueSources,
+          isEstimated: false
+        };
+
+        if (onUpdate) onUpdate(finalResult);
+        return finalResult;
+
+      } catch (error: any) {
+        console.warn(`Model ${modelName} failed:`, error.message);
+        lastError = error;
+        // If it's a 404 (Not Found) or 400 (Bad Request), try the next model variant
+        // If it's 429 (Quota), we might want to stop or try next depending on quota strategy, but usually try next.
+        continue;
       }
-      const metadata = chunk.candidates?.[0]?.groundingMetadata;
-      if (metadata?.groundingChunks) groundingChunks.push(...metadata.groundingChunks);
-    }
-
-    let structuredData: any | undefined;
-    const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
-    const cleanReport = fullText.replace(codeBlockRegex, (match, group1) => {
-        if (!structuredData) {
-            try {
-                const potentialData = JSON.parse(group1);
-                if (potentialData.riskScore !== undefined) {
-                    structuredData = potentialData;
-                    return "";
-                }
-            } catch (e) {}
-        }
-        return match; 
-    }).trim();
-
-    const uniqueSources = [];
-    const seenUris = new Set();
-    for (const g of groundingChunks) {
-        if (g.web?.uri && !seenUris.has(g.web.uri)) {
-            seenUris.add(g.web.uri);
-            uniqueSources.push(g);
-        }
-    }
-
-    const finalResult = {
-      markdownReport: cleanReport || "Analysis generated.",
-      structuredData,
-      groundingChunks: uniqueSources,
-      isEstimated: false
-    };
-
-    if (onUpdate) onUpdate(finalResult);
-    return finalResult;
-
-  } catch (error: any) {
-    console.error(`Model ${modelName} failed:`, error.message);
-    throw new Error(`Analysis failed: ${error.message}. Please check your connection or quota.`);
   }
+
+  throw new Error(`Analysis failed after trying available models. Last error: ${lastError?.message}. Please check your connection.`);
 }
