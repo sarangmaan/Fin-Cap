@@ -1,7 +1,7 @@
 import { AnalysisResult, PortfolioItem } from "../types";
 import { GoogleGenAI } from "@google/genai";
 
-// 1. HARDCODED KEY (As requested)
+// 1. HARDCODED KEY
 const FALLBACK_KEY = "AIzaSyAX_SmJKiCNoxchff0lOcFBJc7GFceTLoM";
 const apiKey = process.env.API_KEY || FALLBACK_KEY;
 
@@ -13,11 +13,11 @@ const ai = new GoogleGenAI({ apiKey });
 
 type StreamUpdate = (data: Partial<AnalysisResult>) => void;
 
-// 2. MODEL SELECTION (Strictly 1.5 Flash with variants)
+// 2. MODEL SELECTION (Updated to supported models)
 const MODELS_TO_TRY = [
-  "gemini-1.5-flash",
-  "gemini-1.5-flash-001", 
-  "gemini-1.5-flash-latest"
+  "gemini-2.5-flash-preview",
+  "gemini-flash-latest",
+  "gemini-2.0-flash-exp"
 ];
 
 // --- API FUNCTIONS ---
@@ -38,7 +38,7 @@ export const chatWithGemini = async (
         - Keep it short. Use emojis.
   `;
 
-  // Try 1.5 versions in order
+  // Try models in order
   for (const model of MODELS_TO_TRY) {
     try {
       const response = await ai.models.generateContent({
@@ -147,11 +147,9 @@ async function executeGeminiRequest(prompt: string, systemInstruction: string, o
       } catch (error: any) {
         console.warn(`Model ${modelName} failed:`, error.message);
         lastError = error;
-        // If it's a 404 (Not Found) or 400 (Bad Request), try the next model variant
-        // If it's 429 (Quota), we might want to stop or try next depending on quota strategy, but usually try next.
         continue;
       }
   }
 
-  throw new Error(`Analysis failed after trying available models. Last error: ${lastError?.message}. Please check your connection.`);
+  throw new Error(`Analysis failed. Please check your internet connection or API quota.`);
 }
