@@ -125,9 +125,9 @@ async function executeGeminiRequest(prompt: string, systemInstruction: string, o
 
   while (attempt <= maxRetries) {
     try {
-      // Switch to gemini-1.5-flash which is the stable production model with free tier limits
+      // USING gemini-2.0-flash-exp to avoid 404 (1.5 mismatch) and 429 (2.0 stable limit)
       const result = await ai.models.generateContentStream({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.0-flash-exp",
         contents: prompt,
         config: {
           systemInstruction: systemInstruction,

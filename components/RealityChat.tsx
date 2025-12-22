@@ -126,7 +126,7 @@ const RealityChat: React.FC<RealityChatProps> = ({ isOpen, onClose, context }) =
       ];
 
       const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.0-flash-exp",
         contents: contents,
         config: {
           systemInstruction: systemInstruction,
