@@ -13,12 +13,11 @@ const ai = new GoogleGenAI({ apiKey });
 
 type StreamUpdate = (data: Partial<AnalysisResult>) => void;
 
-// 2. OPTIMIZED MODEL LIST (Highest Quota First)
+// 2. OPTIMIZED MODEL LIST (Gemini 3 Series)
+// Using Gemini 3 Flash as primary for best speed/cost/limit balance.
 const MODELS_TO_TRY = [
-  "gemini-1.5-flash",      // PRIMARY: Highest rate limits
-  "gemini-1.5-flash-8b",   // BACKUP 1: Separate quota pool
-  "gemini-2.0-flash",      // BACKUP 2: Smarter
-  "gemini-1.5-pro"         // BACKUP 3: Reasoning
+  "gemini-3-flash-preview", // PRIMARY: Newest, fastest, best limits
+  "gemini-3-pro-preview"    // BACKUP: Higher reasoning capabilities
 ];
 
 // --- SIMULATION DATA GENERATOR ---
@@ -122,7 +121,7 @@ export const chatWithGemini = async (
   `;
 
   // Try models for Chat
-  for (const modelName of ["gemini-1.5-flash", "gemini-1.5-flash-8b"]) {
+  for (const modelName of ["gemini-3-flash-preview", "gemini-3-pro-preview"]) {
     try {
       const response = await ai.models.generateContent({
         model: modelName,
@@ -239,7 +238,6 @@ async function executeGeminiRequest(prompt: string, systemInstruction: string, q
           
           if (isAuthError) {
              console.error("API Key Invalid/Expired. Switching to Sim.");
-             // Break outer loop to force simulation
              attempt = maxRetries + 99; 
              break;
           }
@@ -260,7 +258,6 @@ async function executeGeminiRequest(prompt: string, systemInstruction: string, q
         }
       }
       
-      // If we broke out due to Auth Error, stop trying other models
       if (attempt > maxRetries + 10) break;
   }
 

@@ -25,8 +25,8 @@ if (!apiKey) {
 
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-// Models to try for backend redundancy - Optimized for QUOTA (Flash First)
-const BACKEND_MODELS = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.0-flash"];
+// Models to try for backend redundancy - Optimized for QUOTA (Gemini 3 Flash First)
+const BACKEND_MODELS = ["gemini-3-flash-preview", "gemini-3-pro-preview"];
 
 // Mock Generator for Server Side
 const generateMockAnalysis = (query) => {
