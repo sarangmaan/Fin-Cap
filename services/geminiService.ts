@@ -1,7 +1,7 @@
 import { AnalysisResult, PortfolioItem } from "../types";
 import { GoogleGenAI } from "@google/genai";
 
-// 1. HARDCODED FALLBACK KEY (Updated)
+// 1. HARDCODED FALLBACK KEY
 const FALLBACK_KEY = "AIzaSyAX_SmJKiCNoxchff0lOcFBJc7GFceTLoM";
 const apiKey = process.env.API_KEY || FALLBACK_KEY;
 
@@ -13,9 +13,10 @@ const ai = new GoogleGenAI({ apiKey });
 
 type StreamUpdate = (data: Partial<AnalysisResult>) => void;
 
-// 2. OPTIMIZED MODEL LIST (Gemini 1.5 Flash)
+// 2. OPTIMIZED MODEL LIST (Gemini 2.5 Flash - Supported by SDK 1.33.0)
 const MODELS_TO_TRY = [
-  "gemini-1.5-flash"
+  "gemini-2.5-flash-preview",
+  "gemini-flash-latest"
 ];
 
 // --- API FUNCTIONS ---
@@ -38,7 +39,7 @@ export const chatWithGemini = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash-preview",
       contents: [...history, { role: 'user', parts: [{ text: message }] }],
       config: { systemInstruction, maxOutputTokens: 300 }
     });
@@ -76,7 +77,7 @@ async function executeGeminiRequest(prompt: string, systemInstruction: string, o
       throw new Error("API Key is missing");
   }
 
-  const modelName = MODELS_TO_TRY[0]; // gemini-1.5-flash
+  const modelName = MODELS_TO_TRY[0]; // gemini-2.5-flash-preview
 
   try {
     const result = await ai.models.generateContentStream({
