@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, X, Skull } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { chatWithGemini } from '../services/geminiService';
 
 interface RealityChatProps {
   isOpen: boolean;
@@ -62,81 +62,14 @@ const RealityChat: React.FC<RealityChatProps> = ({ isOpen, onClose, context }) =
     setLoading(true);
 
     try {
-      const apiKey = process.env.API_KEY || "AIzaSyCR27lyrzBJZS_taZGGa62oy548x3L2tEs";
-      const ai = new GoogleGenAI({ apiKey });
-      
-      const isHighRisk = context.riskScore >= 60;
-      const isSafe = context.riskScore <= 40;
-
-      // Construct System Prompt
-      const systemInstruction = `
-        You are 'The Reality Check', a witty, sarcastic, but intelligent financial assistant.
-        
-        CONTEXT:
-        - Asset: ${context.symbol}
-        - Risk Score: ${context.riskScore}/100
-        - Sentiment: ${context.sentiment}
-        
-        PERSONALITY RULES:
-        1. **High Risk (>60)**: 
-           - ATTITUDE: Ruthless, mocking, warning.
-           - RESPONSE: Roast the user for choosing this. Examples: "Do you hate money?", "This is a dumpster fire."
-        
-        2. **Low Risk (<40)**: 
-           - ATTITUDE: Impressed, validating, slightly surprised.
-           - RESPONSE: Praise the user. Examples: "Finally, a smart move.", "I can't believe it, you actually picked a winner.", "Solid choice, try not to ruin it."
-           - DO NOT ROAST LOW RISK ASSETS. Be supportive.
-        
-        3. **Mid Risk (40-60)**: 
-           - ATTITUDE: Skeptical, bored.
-           - RESPONSE: "It's mid.", "Flip a coin."
-        
-        INTERACTION LOGIC:
-        - **IF User asks a direct question** ("Is this good?", "Should I buy?", "What do you think?"):
-          - YOU MUST start with a clear verdict based on risk: "VERDICT: [YES/NO/RISKY]."
-          - Then add the personality commentary.
-          
-        - **IF User says "I bought"**:
-          - High Risk: "My condolences to your wallet. 💸"
-          - Low Risk: "Look at you, making profits. 👑"
-
-        - **GENERAL**:
-          - Keep it short (under 3 sentences).
-          - Use emojis.
-      `;
-
       // Build History for Gemini
-      // We map our messages state to the API format
       let history = messages.map(m => ({
         role: m.sender === 'user' ? 'user' : 'model',
         parts: [{ text: m.text }]
       }));
 
-      // Hack: Gemini chat history should ideally start with 'user'. 
-      if (history.length > 0 && history[0].role === 'model') {
-         history = [
-           { role: 'user', parts: [{ text: `Give me a reality check on ${context.symbol}.` }] },
-           ...history
-         ];
-      }
-
-      // Add the new message
-      const contents = [
-         ...history,
-         { role: 'user', parts: [{ text: currentInput }] }
-      ];
-
-      const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash-exp",
-        contents: contents,
-        config: {
-          systemInstruction: systemInstruction,
-          temperature: 1.0, 
-          maxOutputTokens: 500
-        }
-      });
-
-      const replyText = response.text || "I'm ignoring you. (No response)";
+      // Use Robust Service
+      const replyText = await chatWithGemini(history, currentInput, context);
 
       setMessages(prev => [...prev, { 
         id: (Date.now() + 1).toString(), 
@@ -146,15 +79,10 @@ const RealityChat: React.FC<RealityChatProps> = ({ isOpen, onClose, context }) =
 
     } catch (err: any) {
       console.error("RealityChat Error:", err);
-      let errorText = "I'm ignoring you right now. 💀 (AI Error)";
-      
-      if (err.message?.includes('API key')) {
-         errorText = "I can't see your API Key. Check your environment variables. 🔑";
-      }
-
+      // Fail-safe just in case
       setMessages(prev => [...prev, { 
         id: (Date.now() + 1).toString(), 
-        text: errorText, 
+        text: "My neural link is fried. Be careful out there. 📉 (Offline)", 
         sender: 'ai' 
       }]);
     } finally {

@@ -25,8 +25,8 @@ if (!apiKey) {
 
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-// Models to try for backend redundancy - Optimized for stability
-const BACKEND_MODELS = ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"];
+// Models to try for backend redundancy - Optimized for QUOTA (Flash First)
+const BACKEND_MODELS = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.0-flash"];
 
 // Mock Generator for Server Side
 const generateMockAnalysis = (query) => {
@@ -52,7 +52,6 @@ app.post('/api/analyze', async (req, res) => {
     }
 
     if (!ai) {
-         // Fallback if no AI instance
          return res.json({ analysis: generateMockAnalysis(marketQuery || "Portfolio") });
     }
 
@@ -74,7 +73,6 @@ app.post('/api/analyze', async (req, res) => {
     }
 
     if (!responseText) {
-        // FAIL-SAFE: Return mock data instead of error
         return res.json({ analysis: generateMockAnalysis(marketQuery || "Portfolio") });
     }
     
@@ -87,7 +85,6 @@ app.post('/api/analyze', async (req, res) => {
 
   } catch (error) {
     console.error("Analysis Error:", error);
-    // FAIL-SAFE
     res.json({ analysis: generateMockAnalysis("Unknown") });
   }
 });

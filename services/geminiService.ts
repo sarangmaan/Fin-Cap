@@ -13,16 +13,15 @@ const ai = new GoogleGenAI({ apiKey });
 
 type StreamUpdate = (data: Partial<AnalysisResult>) => void;
 
-// 2. OPTIMIZED MODEL LIST (Best Working Models)
-// Prioritizing Stable 2.0 Flash, then High-Reasoning 1.5 Pro, then High-Availability 1.5 Flash.
+// 2. OPTIMIZED MODEL LIST (Highest Quota First)
 const MODELS_TO_TRY = [
-  "gemini-2.0-flash",      // Primary: Best balance of speed/intelligence/stability
-  "gemini-1.5-pro",        // Backup 1: High reasoning power (slower but deeper)
-  "gemini-1.5-flash"       // Backup 2: Highest availability/speed
+  "gemini-1.5-flash",      // PRIMARY: Highest rate limits
+  "gemini-1.5-flash-8b",   // BACKUP 1: Separate quota pool
+  "gemini-2.0-flash",      // BACKUP 2: Smarter
+  "gemini-1.5-pro"         // BACKUP 3: Reasoning
 ];
 
 // --- SIMULATION DATA GENERATOR ---
-// Used when all API calls fail to ensure the app never crashes.
 const generateMockData = (query: string): AnalysisResult => {
   const q = query.toLowerCase();
   const isCrypto = q.includes('btc') || q.includes('crypto') || q.includes('coin') || q.includes('eth');
@@ -36,7 +35,7 @@ const generateMockData = (query: string): AnalysisResult => {
     markdownReport: `
 # Analysis for ${query} (Offline Simulation)
 
-**Note:** High traffic on live AI models. Switching to forensic simulation mode based on historical data patterns.
+**Note:** Global API traffic limit reached. Switching to forensic simulation mode based on historical data patterns.
 
 ## Executive Summary
 **Current Price:** ${price} (${change})
@@ -98,6 +97,48 @@ While long-term fundamentals remain intact, short-term macroeconomic headwinds r
   };
 };
 
+const getSimulatedChatResponse = (riskScore: number): string => {
+  if (riskScore >= 60) return "Global networks are congested, but my offline charts say: RUN. 📉 (Simulated)";
+  if (riskScore <= 40) return "My connection is spotty, but this asset looks cleaner than my server room. ✅ (Simulated)";
+  return "Cannot reach the live market brain, but it looks mid. Flip a coin. 🪙 (Simulated)";
+};
+
+// --- API FUNCTIONS ---
+
+export const chatWithGemini = async (
+  history: any[], 
+  message: string, 
+  context: { symbol: string, riskScore: number, sentiment: string }
+): Promise<string> => {
+  if (!apiKey) return getSimulatedChatResponse(context.riskScore);
+
+  const systemInstruction = `
+        You are 'The Reality Check', a witty, sarcastic, but intelligent financial assistant.
+        CONTEXT: Asset: ${context.symbol}, Risk: ${context.riskScore}/100.
+        PERSONALITY:
+        - High Risk (>60): Roast the user. "Do you hate money?"
+        - Low Risk (<40): Praise the user. "Finally, a smart move."
+        - Keep it short. Use emojis.
+  `;
+
+  // Try models for Chat
+  for (const modelName of ["gemini-1.5-flash", "gemini-1.5-flash-8b"]) {
+    try {
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: [...history, { role: 'user', parts: [{ text: message }] }],
+        config: { systemInstruction, maxOutputTokens: 300 }
+      });
+      return response.text || "I'm speechless.";
+    } catch (e: any) {
+      console.warn(`Chat model ${modelName} failed:`, e.message);
+      if (e.message?.includes('429') || e.message?.includes('400')) continue; // Try next model
+    }
+  }
+
+  return getSimulatedChatResponse(context.riskScore);
+};
+
 export const analyzeMarket = async (query: string, onUpdate?: StreamUpdate): Promise<AnalysisResult> => {
   const prompt = `Perform a deep-dive financial analysis for: "${query}".`;
   const systemInstruction = `You are an Elite Forensic Accountant. Output a structured report with a Whistleblower JSON section at the end.`;
@@ -122,7 +163,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function executeGeminiRequest(prompt: string, systemInstruction: string, queryForSim: string, onUpdate?: StreamUpdate): Promise<AnalysisResult> {
   if (!apiKey) {
-      console.warn("No API Key, using simulation.");
+      if (onUpdate) onUpdate({ markdownReport: "⚠️ No API Key. Using Simulation.", isEstimated: true });
       return generateMockData(queryForSim);
   }
 
@@ -192,8 +233,22 @@ async function executeGeminiRequest(prompt: string, systemInstruction: string, q
         } catch (error: any) {
           console.warn(`Model ${modelName} failed (Attempt ${attempt + 1}):`, error.message);
           
-          const isOverloaded = error.message?.includes('503') || error.message?.includes('overloaded') || error.status === 503 || error.status === 429;
+          const isQuotaError = error.message?.includes('429') || error.status === 429;
+          const isAuthError = error.message?.includes('400') || error.status === 400 || error.message?.includes('API key');
+          const isOverloaded = error.message?.includes('503') || error.message?.includes('overloaded') || error.status === 503;
           
+          if (isAuthError) {
+             console.error("API Key Invalid/Expired. Switching to Sim.");
+             // Break outer loop to force simulation
+             attempt = maxRetries + 99; 
+             break;
+          }
+
+          if (isQuotaError) {
+             console.warn("Quota Limit Reached. Skipping retry.");
+             break; // Next model
+          }
+
           if (isOverloaded && attempt < maxRetries) {
             await delay(backoff);
             backoff *= 1.5;
@@ -204,13 +259,16 @@ async function executeGeminiRequest(prompt: string, systemInstruction: string, q
           }
         }
       }
+      
+      // If we broke out due to Auth Error, stop trying other models
+      if (attempt > maxRetries + 10) break;
   }
 
   // --- FAIL-SAFE: RETURN MOCK DATA INSTEAD OF CRASHING ---
   console.error("All AI models failed. Switching to Simulation Mode.");
   if (onUpdate) {
-      onUpdate({ markdownReport: "⚠️ Live Analysis Unavailable. Generating Forensic Simulation...", isEstimated: true });
-      await delay(1500); // Fake loading time for realism
+      onUpdate({ markdownReport: "⚠️ Live API Unavailable (Global Quota). Generating Forensic Simulation...", isEstimated: true });
+      await delay(1000); 
   }
   return generateMockData(queryForSim);
 }
