@@ -16,13 +16,17 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(join(__dirname, 'dist')));
 
-// Initialize Gemini (Server Side)
-const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+// Initialize Gemini (Server Side) with Fallback Key
+const apiKey = process.env.API_KEY || "AIzaSyCR27lyrzBJZS_taZGGa62oy548x3L2tEs";
+
 if (!apiKey) {
   console.warn("⚠️ Warning: API_KEY not found in environment variables. Server-side AI calls will fail.");
 }
-// We create the instance safely, but individual routes will check for key existence
+
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+
+// Models to try for backend redundancy
+const BACKEND_MODELS = ["gemini-2.0-flash-exp", "gemini-2.0-flash", "gemini-1.5-flash"];
 
 // --- 1. THE ANALYST ROUTE ---
 app.post('/api/analyze', async (req, res) => {
@@ -59,19 +63,27 @@ app.post('/api/analyze', async (req, res) => {
         }
       `;
     } else {
-      // Fallback for generic prompts
       promptText = req.body.prompt || "Analyze the market.";
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash-exp",
-      contents: promptText,
-      config: {
-        responseMimeType: "application/json"
-      }
-    });
+    let responseText = null;
 
-    const responseText = response.text;
+    // Backend Fallback Loop
+    for (const model of BACKEND_MODELS) {
+        try {
+            const response = await ai.models.generateContent({
+                model: model,
+                contents: promptText,
+                config: { responseMimeType: "application/json" }
+            });
+            responseText = response.text;
+            break; // Success
+        } catch (e) {
+            console.warn(`Backend model ${model} failed, trying next...`);
+        }
+    }
+
+    if (!responseText) throw new Error("All backend models failed.");
     
     // Attempt to parse JSON
     try {
@@ -104,7 +116,6 @@ app.post('/api/chat', async (req, res) => {
     }
 
     const { message, context } = req.body; 
-    
     let systemInstruction = "You are 'The Reality Check', a sarcastic, witty, and brutally honest financial friend.";
     
     if (context && context.riskScore > 70) {
@@ -113,16 +124,24 @@ app.post('/api/chat', async (req, res) => {
       systemInstruction += " Be skeptical and witty.";
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash-exp",
-      contents: message,
-      config: {
-        systemInstruction: systemInstruction,
-        maxOutputTokens: 200
-      }
-    });
+    let reply = "Server busy.";
 
-    res.json({ reply: response.text });
+    for (const model of BACKEND_MODELS) {
+        try {
+            const response = await ai.models.generateContent({
+              model: model,
+              contents: message,
+              config: {
+                systemInstruction: systemInstruction,
+                maxOutputTokens: 200
+              }
+            });
+            reply = response.text;
+            break;
+        } catch(e) { console.warn("Chat model failed, retrying..."); }
+    }
+
+    res.json({ reply: reply });
 
   } catch (error) {
     console.error("Chat Error:", error);

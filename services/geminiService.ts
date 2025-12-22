@@ -1,17 +1,29 @@
 import { AnalysisResult, PortfolioItem } from "../types";
 import { GoogleGenAI } from "@google/genai";
 
-const apiKey = process.env.API_KEY;
+// 1. HARDCODED FALLBACK KEY (As requested for immediate fix)
+const FALLBACK_KEY = "AIzaSyCR27lyrzBJZS_taZGGa62oy548x3L2tEs";
+const apiKey = process.env.API_KEY || FALLBACK_KEY;
 
 if (!apiKey) {
-  console.error("API_KEY is missing. Please add API_KEY to your Render Environment Variables.");
+  console.error("API_KEY is missing.");
 }
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+const ai = new GoogleGenAI({ apiKey });
 
 type StreamUpdate = (data: Partial<AnalysisResult>) => void;
 
+// 2. FALLBACK MODELS LIST
+// If the first one fails (traffic/limit), it tries the next one automatically.
+const MODELS_TO_TRY = [
+  "gemini-2.0-flash-exp",   // Primary: Fast, Experimental
+  "gemini-2.0-flash",       // Backup 1: Stable Flash
+  "gemini-1.5-pro-latest",  // Backup 2: High Intelligence
+  "gemini-1.5-flash-latest" // Backup 3: Old Reliable
+];
+
 export const analyzeMarket = async (query: string, onUpdate?: StreamUpdate): Promise<AnalysisResult> => {
-  if (!apiKey) throw new Error("API Key is missing. Please add 'API_KEY' to your Render Environment Variables and Redeploy.");
+  if (!apiKey) throw new Error("API Key is missing.");
 
   const prompt = `
     Perform a deep-dive financial analysis for: "${query}".
@@ -116,87 +128,100 @@ export const analyzeBubbles = async (onUpdate?: StreamUpdate): Promise<AnalysisR
     return await executeGeminiRequest(prompt, systemInstruction, onUpdate);
 };
 
+// Helper for delays
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function executeGeminiRequest(prompt: string, systemInstruction: string, onUpdate?: StreamUpdate): Promise<AnalysisResult> {
-  let attempt = 0;
-  const maxRetries = 3;
-  let backoff = 2000;
-
-  while (attempt <= maxRetries) {
-    try {
-      // USING gemini-2.0-flash-exp to avoid 404 (1.5 mismatch) and 429 (2.0 stable limit)
-      const result = await ai.models.generateContentStream({
-        model: "gemini-2.0-flash-exp",
-        contents: prompt,
-        config: {
-          systemInstruction: systemInstruction,
-          tools: [{ googleSearch: {} }],
-        },
-      });
-
-      let fullText = "";
-      let groundingChunks: any[] = [];
+  let lastError: any = null;
+  
+  // 3. ROBUST RETRY LOOP
+  // Cycle through models until one works
+  for (const modelName of MODELS_TO_TRY) {
+      console.log(`Trying model: ${modelName}...`);
       
-      for await (const chunk of result) {
-        if (chunk.text) {
-          fullText += chunk.text;
-          if (onUpdate) onUpdate({ markdownReport: fullText, isEstimated: false });
+      let attempt = 0;
+      const maxRetries = 1; // 1 retry per model before switching
+      let backoff = 1000;
+
+      while (attempt <= maxRetries) {
+        try {
+          const result = await ai.models.generateContentStream({
+            model: modelName,
+            contents: prompt,
+            config: {
+              systemInstruction: systemInstruction,
+              tools: [{ googleSearch: {} }],
+            },
+          });
+
+          let fullText = "";
+          let groundingChunks: any[] = [];
+          
+          for await (const chunk of result) {
+            if (chunk.text) {
+              fullText += chunk.text;
+              // Provide live updates so user sees progress
+              if (onUpdate) onUpdate({ markdownReport: fullText, isEstimated: false });
+            }
+            const metadata = chunk.candidates?.[0]?.groundingMetadata;
+            if (metadata?.groundingChunks) groundingChunks.push(...metadata.groundingChunks);
+          }
+
+          // Parse JSON from the response
+          let structuredData: any | undefined;
+          const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
+          
+          const cleanReport = fullText.replace(codeBlockRegex, (match, group1) => {
+              if (!structuredData) {
+                  try {
+                      const potentialData = JSON.parse(group1);
+                      if (potentialData.riskScore !== undefined) {
+                          structuredData = potentialData;
+                          return "";
+                      }
+                  } catch (e) {}
+              }
+              return match; 
+          }).trim();
+
+          const uniqueSources = [];
+          const seenUris = new Set();
+          for (const g of groundingChunks) {
+              if (g.web?.uri && !seenUris.has(g.web.uri)) {
+                  seenUris.add(g.web.uri);
+                  uniqueSources.push(g);
+              }
+          }
+
+          const finalResult = {
+            markdownReport: cleanReport || "Analysis generated.",
+            structuredData,
+            groundingChunks: uniqueSources,
+            isEstimated: false
+          };
+
+          if (onUpdate) onUpdate(finalResult);
+          return finalResult; // SUCCESS: Return immediately
+
+        } catch (error: any) {
+          console.warn(`Model ${modelName} failed (Attempt ${attempt + 1}):`, error.message);
+          lastError = error;
+
+          const isOverloaded = error.message?.includes('503') || error.message?.includes('overloaded') || error.status === 503 || error.status === 429;
+          
+          if (isOverloaded && attempt < maxRetries) {
+            await delay(backoff);
+            backoff *= 1.5;
+            attempt++;
+            continue; // Retry SAME model
+          } else {
+             break; // STOP retrying this model, move to NEXT model
+          }
         }
-        const metadata = chunk.candidates?.[0]?.groundingMetadata;
-        if (metadata?.groundingChunks) groundingChunks.push(...metadata.groundingChunks);
       }
-
-      let structuredData: any | undefined;
-      const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
-      
-      const cleanReport = fullText.replace(codeBlockRegex, (match, group1) => {
-          if (!structuredData) {
-              try {
-                  const potentialData = JSON.parse(group1);
-                  if (potentialData.riskScore !== undefined) {
-                      structuredData = potentialData;
-                      return "";
-                  }
-              } catch (e) {}
-          }
-          return match; 
-      }).trim();
-
-      const uniqueSources = [];
-      const seenUris = new Set();
-      for (const g of groundingChunks) {
-          if (g.web?.uri && !seenUris.has(g.web.uri)) {
-              seenUris.add(g.web.uri);
-              uniqueSources.push(g);
-          }
-      }
-
-      const finalResult = {
-        markdownReport: cleanReport || "Analysis generated.",
-        structuredData,
-        groundingChunks: uniqueSources,
-        isEstimated: false
-      };
-
-      if (onUpdate) onUpdate(finalResult);
-      return finalResult;
-
-    } catch (error: any) {
-      console.error("Gemini Request Error:", error);
-      const isOverloaded = error.message?.includes('503') || error.message?.includes('overloaded') || error.status === 503 || error.status === 429;
-      
-      // If we are hitting rate limits, retry with backoff
-      if (isOverloaded && attempt < maxRetries) {
-        await delay(backoff);
-        backoff *= 2;
-        attempt++;
-        continue;
-      }
-      
-      // If the error persists or is not a rate limit, throw it up
-      throw new Error(error.message || "Failed to contact Gemini API.");
-    }
   }
-  throw new Error("Service unavailable. Rate limits reached.");
+
+  // If all models failed
+  console.error("All AI models failed.", lastError);
+  throw new Error("Analysis Halted: High traffic. Please wait 10 seconds and try again.");
 }

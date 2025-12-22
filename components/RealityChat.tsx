@@ -62,7 +62,8 @@ const RealityChat: React.FC<RealityChatProps> = ({ isOpen, onClose, context }) =
     setLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.API_KEY || "AIzaSyCR27lyrzBJZS_taZGGa62oy548x3L2tEs";
+      const ai = new GoogleGenAI({ apiKey });
       
       const isHighRisk = context.riskScore >= 60;
       const isSafe = context.riskScore <= 40;
