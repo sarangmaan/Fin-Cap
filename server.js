@@ -17,7 +17,7 @@ app.use(express.json());
 app.use(express.static(join(__dirname, 'dist')));
 
 // Initialize Gemini (Server Side) with Fallback Key
-const apiKey = process.env.API_KEY || "AIzaSyCR27lyrzBJZS_taZGGa62oy548x3L2tEs";
+const apiKey = process.env.API_KEY || "AIzaSyAX_SmJKiCNoxchff0lOcFBJc7GFceTLoM";
 
 if (!apiKey) {
   console.warn("⚠️ Warning: API_KEY not found in environment variables. Server-side AI calls will fail.");
@@ -25,10 +25,10 @@ if (!apiKey) {
 
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-// Models to try for backend redundancy - Optimized for QUOTA (Gemini 3 Flash First)
-const BACKEND_MODELS = ["gemini-3-flash-preview", "gemini-3-pro-preview"];
+// Models to try for backend redundancy
+const BACKEND_MODELS = ["gemini-1.5-flash"];
 
-// Mock Generator for Server Side
+// Mock Generator for Server Side (Only used if server itself is broken/missing key)
 const generateMockAnalysis = (query) => {
     return {
         sentiment: "Neutral",
