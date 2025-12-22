@@ -29,7 +29,8 @@ import {
   Download,
   Info,
   Activity,
-  Zap
+  Zap,
+  WifiOff
 } from 'lucide-react';
 
 interface AnalysisViewProps {
@@ -296,8 +297,14 @@ const AnalysisView: React.FC<AnalysisViewProps> = ({ data, title }) => {
               </button>
           </div>
           <div className="flex justify-center">
-              <div className="text-[10px] text-slate-500 flex items-center justify-center gap-3 font-mono uppercase tracking-[0.3em] opacity-80 bg-slate-900/50 px-6 py-2 rounded-full border border-slate-800">
-                  {isStreaming ? (<><Loader2 className="w-3 h-3 animate-spin text-sky-500" /> DECRYPTING MARKET DATA...</>) : (<><span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> LIVE FORENSIC STATUS: ACTIVE</>)}
+              <div className={`text-[10px] flex items-center justify-center gap-3 font-mono uppercase tracking-[0.3em] px-6 py-2 rounded-full border ${isEstimated ? 'text-amber-500 bg-amber-950/20 border-amber-500/30' : 'text-slate-500 opacity-80 bg-slate-900/50 border-slate-800'}`}>
+                  {isStreaming ? (
+                    <><Loader2 className="w-3 h-3 animate-spin text-sky-500" /> DECRYPTING MARKET DATA...</>
+                  ) : isEstimated ? (
+                    <><WifiOff className="w-3 h-3" /> OFFLINE SIMULATION MODE</>
+                  ) : (
+                    <><span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> LIVE FORENSIC STATUS: ACTIVE</>
+                  )}
               </div>
           </div>
       </div>
