@@ -28,7 +28,7 @@ const App: React.FC = () => {
 
   // Safety Timeout: Force stop loading if it gets stuck for more than 45 seconds
   useEffect(() => {
-    let safetyTimer: NodeJS.Timeout;
+    let safetyTimer: ReturnType<typeof setTimeout>;
     if (loading) {
         safetyTimer = setTimeout(() => {
             if (loading) {
