@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 
+// Using gemini-1.5-flash-002 for stable Flash tier performance
 const MODEL_NAME = "gemini-1.5-flash-002";
 
 export default async function handler(req: any, res: any) {

@@ -9,7 +9,8 @@ const app = express();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Configuration
-// Using gemini-1.5-flash-002 ensures we hit the stable version of 1.5 Flash
+// Using gemini-1.5-flash-002 to ensure stability and avoid 404s on generic aliases, 
+// while maintaining the high rate limits of the Flash tier.
 const MODEL_NAME = "gemini-1.5-flash-002"; 
 
 // Middleware
@@ -223,6 +224,8 @@ app.post('/api/analyze', async (req, res) => {
 });
 
 // Handle React Routing (Catch-All)
+// This must come AFTER API routes. It ensures that if the API route isn't hit, 
+// and a static file isn't found, we return index.html so React Router works.
 app.get('*', (req, res) => {
     try {
         res.sendFile(join(__dirname, 'dist', 'index.html'));
@@ -231,6 +234,8 @@ app.get('*', (req, res) => {
     }
 });
 
+// CRITICAL: Render.com uses a dynamic PORT environment variable.
+// We must listen on process.env.PORT if available, and bind to 0.0.0.0.
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n> FinCap Forensic Engine running on port ${PORT}`);
