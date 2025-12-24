@@ -6,8 +6,9 @@ const parseGeminiResponse = (rawText: string, metadata: any[]): AnalysisResult =
   let structuredData = null;
   let markdownReport = rawText;
 
-  // 1. Regex to find the JSON block inside ```json ... ```
-  const jsonMatch = rawText.match(/```json\s*([\s\S]*?)\s*```/);
+  // 1. Regex to find the JSON block inside ```json ... ``` or just ``` ... ```
+  // Added optional (?:json)? to handle cases where model omits language tag
+  const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
 
   if (jsonMatch && jsonMatch[1]) {
     try {

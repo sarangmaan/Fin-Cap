@@ -13,7 +13,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(join(__dirname, 'dist')));
 
-// --- THE ANALYST ROUTE (Updated for Gemini 1.5 Flash 002) ---
+// --- THE ANALYST ROUTE (Updated for Gemini 1.5 Flash) ---
 app.post('/api/analyze', async (req, res) => {
   const { mode, data } = req.body;
   console.log(`\n[API] Received request for mode: ${mode}`);
@@ -169,12 +169,12 @@ app.post('/api/analyze', async (req, res) => {
     // 4. Execute Request
     console.log("[API] Sending request to Gemini...");
     const result = await ai.models.generateContent({
-      model: "gemini-1.5-flash-002",
+      model: "gemini-1.5-flash",
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         systemInstruction: systemInstruction,
         tools: [{ googleSearch: {} }],
-        maxOutputTokens: 3500,
+        maxOutputTokens: 8192,
         temperature: 0.3
       }
     });
@@ -228,5 +228,5 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n> FinCap Forensic Engine running on port ${PORT}`);
-    console.log(`> Model: gemini-1.5-flash-002`);
+    console.log(`> Model: gemini-1.5-flash`);
 });
