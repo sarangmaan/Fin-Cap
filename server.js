@@ -9,9 +9,8 @@ const app = express();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Configuration
-// Using gemini-1.5-flash-002 to ensure stability and avoid 404s on generic aliases, 
-// while maintaining the high rate limits of the Flash tier.
-const MODEL_NAME = "gemini-1.5-flash-002"; 
+// CRITICAL: Using User-Specified Model ID
+const MODEL_NAME = "gemini-2.5-flash"; 
 
 // Middleware
 app.use(cors());
@@ -52,6 +51,7 @@ app.post('/api/analyze', async (req, res) => {
       4. **FORENSIC TONE**: Use professional, cynical institutional language. Focus on cash burn, debt maturity, insider selling, and margin compression.
 
       STEP 1: GENERATE JSON DATA (Output this FIRST)
+      You MUST start your response with a valid JSON block.
       \`\`\`json
       {
         "riskScore": number (0-100),

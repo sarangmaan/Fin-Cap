@@ -42,9 +42,11 @@ const parseGeminiResponse = (rawText: string, metadata: any[]): AnalysisResult =
 };
 
 // Helper to call the backend API
+// CRITICAL FIX: Use window.location.origin to avoid connecting to localhost in production
 const callBackend = async (mode: string, payloadData: any) => {
     try {
-        const response = await fetch('/api/analyze', {
+        const BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
+        const response = await fetch(`${BASE_URL}/api/analyze`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -109,7 +111,8 @@ export const chatWithGemini = async (
         // Chat mode on backend expects a JSON string containing history, message, and context
         const payload = JSON.stringify({ history, message, context });
         
-        const response = await fetch('/api/analyze', {
+        const BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
+        const response = await fetch(`${BASE_URL}/api/analyze`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ mode: 'chat', data: payload })
