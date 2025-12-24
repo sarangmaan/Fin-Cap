@@ -156,7 +156,7 @@ const parseGeminiResponse = (rawText: string, metadata: any[]): AnalysisResult =
 const executeGenAIRequest = async (prompt: string, systemInstruction: string) => {
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-1.5-flash",
             contents: prompt,
             config: {
                 systemInstruction: systemInstruction,
@@ -226,7 +226,7 @@ export const chatWithGemini = async (
         
         // Create Chat
         const chat = ai.chats.create({
-            model: "gemini-3-flash-preview",
+            model: "gemini-1.5-flash",
             config: {
                 systemInstruction: CHAT_SYSTEM_INSTRUCTION + "\n" + contextStr,
             },
