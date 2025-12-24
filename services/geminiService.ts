@@ -54,7 +54,15 @@ const callBackend = async (mode: string, payloadData: any) => {
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `Server Error: ${response.status}`);
+            let errorMessage = errorData.error || `Server Error: ${response.status}`;
+            
+            // Detect common "Model Not Found" error which indicates stale deployment or model misconfiguration
+            const errorString = JSON.stringify(errorData).toLowerCase();
+            if (errorString.includes('not found') || errorString.includes('404')) {
+                errorMessage = "Deployment Error: The configured AI model version was not found. Please redeploy the application.";
+            }
+
+            throw new Error(errorMessage);
         }
 
         return await response.json();

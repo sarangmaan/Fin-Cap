@@ -8,12 +8,15 @@ import 'dotenv/config';
 const app = express();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Configuration
+// Using gemini-1.5-flash-002 ensures we hit the stable version of 1.5 Flash
+const MODEL_NAME = "gemini-1.5-flash-002"; 
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 
 // 1. Serve Static Files from 'dist' (Created by 'npm run build')
-// This allows the Node server to serve the React frontend
 app.use(express.static(join(__dirname, 'dist')));
 
 // --- THE ANALYST ROUTE ---
@@ -169,9 +172,11 @@ app.post('/api/analyze', async (req, res) => {
     }
 
     // 4. Execute Request
+    console.log(`[API] Using Model: ${MODEL_NAME}`);
     console.log("[API] Sending request to Gemini...");
+    
     const result = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: MODEL_NAME,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         systemInstruction: systemInstruction,
@@ -212,13 +217,12 @@ app.post('/api/analyze', async (req, res) => {
 
   } catch (error) {
     console.error("[API ERROR] Analysis Failed:", error);
-    res.status(500).json({ error: error.message || 'Forensic Engine Offline' });
+    // Explicitly send JSON error so frontend can parse it
+    res.status(500).json({ error: error.message || 'Forensic Engine Offline', details: JSON.stringify(error) });
   }
 });
 
 // Handle React Routing (Catch-All)
-// This must come AFTER API routes. It ensures that if the API route isn't hit, 
-// and a static file isn't found, we return index.html so React Router works.
 app.get('*', (req, res) => {
     try {
         res.sendFile(join(__dirname, 'dist', 'index.html'));
@@ -230,6 +234,6 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n> FinCap Forensic Engine running on port ${PORT}`);
-    console.log(`> Model: gemini-1.5-flash`);
+    console.log(`> Configured Model: ${MODEL_NAME}`);
     console.log(`> API Key present: ${!!process.env.API_KEY}`);
 });
