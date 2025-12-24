@@ -9,7 +9,7 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "vite"
+    "start": "node server.js"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -24,8 +24,8 @@
     "tailwind-merge": "^2.2.1",
     "framer-motion": "^11.0.8",
     "html2canvas": "^1.4.1",
-"jspdf": "^2.5.1",
-    "@google/genai": "^1.32.0"
+    "jspdf": "^2.5.1",
+    "@google/genai": "^1.33.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

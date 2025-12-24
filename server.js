@@ -11,9 +11,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// 1. Serve Static Files from 'dist' (Created by 'npm run build')
+// This allows the Node server to serve the React frontend
 app.use(express.static(join(__dirname, 'dist')));
 
-// --- THE ANALYST ROUTE (Updated for Gemini 1.5 Flash) ---
+// --- THE ANALYST ROUTE ---
 app.post('/api/analyze', async (req, res) => {
   const { mode, data } = req.body;
   console.log(`\n[API] Received request for mode: ${mode}`);
@@ -142,10 +145,9 @@ app.post('/api/analyze', async (req, res) => {
         prompt = `Scan global markets for major Bubbles, Overvalued Assets, and Crash Risks. Identify at least 4-6 specific assets in the 'topBubbleAssets' JSON array.`;
         
     } else if (mode === 'chat') {
-        // Chat mode uses a different personality and no forced JSON
         let payload;
         try {
-            payload = JSON.parse(data);
+            payload = typeof data === 'string' ? JSON.parse(data) : data;
         } catch (e) {
             payload = { history: [], message: data, context: {} };
         }
@@ -182,15 +184,14 @@ app.post('/api/analyze', async (req, res) => {
     const text = result.text;
     console.log("[API] Response received. Length:", text ? text.length : 0);
     
-    // For Chat mode, we just return the text directly
+    // For Chat mode, return text directly
     if (mode === 'chat') {
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        res.write(text || "I'm speechless.");
-        res.end();
+        res.status(200).send(text || "I'm speechless.");
         return;
     }
     
-    // For Analysis modes, we extract metadata and send JSON
+    // For Analysis modes, extract metadata and send JSON
     const sources = result.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     const uniqueSources = [];
     const seenUris = new Set();
@@ -211,17 +212,18 @@ app.post('/api/analyze', async (req, res) => {
 
   } catch (error) {
     console.error("[API ERROR] Analysis Failed:", error);
-    // Explicitly send JSON error so frontend doesn't choke on HTML
     res.status(500).json({ error: error.message || 'Forensic Engine Offline' });
   }
 });
 
-// Handle React Routing
+// Handle React Routing (Catch-All)
+// This must come AFTER API routes. It ensures that if the API route isn't hit, 
+// and a static file isn't found, we return index.html so React Router works.
 app.get('*', (req, res) => {
     try {
         res.sendFile(join(__dirname, 'dist', 'index.html'));
     } catch (e) {
-        res.send('API Server Running. Frontend should be served via Vite in dev mode.');
+        res.status(500).send('Server Error: Could not serve index.html');
     }
 });
 
@@ -229,4 +231,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n> FinCap Forensic Engine running on port ${PORT}`);
     console.log(`> Model: gemini-1.5-flash`);
+    console.log(`> API Key present: ${!!process.env.API_KEY}`);
 });
