@@ -18,11 +18,14 @@ import {
   ShieldAlert, 
   Activity, 
   Search,
-  Loader2
+  Loader2,
+  Play
 } from 'lucide-react';
 
 interface BubbleScopeViewProps {
-  data: AnalysisResult;
+  data: AnalysisResult | null;
+  onScan: () => void;
+  isLoading: boolean;
 }
 
 const Skeleton: React.FC<{ className?: string }> = ({ className }) => (
@@ -58,7 +61,29 @@ const BubbleAssetCard: React.FC<{ asset: any }> = ({ asset }) => {
     );
 };
 
-const BubbleScopeView: React.FC<BubbleScopeViewProps> = ({ data }) => {
+const BubbleScopeView: React.FC<BubbleScopeViewProps> = ({ data, onScan, isLoading }) => {
+  if (!data) {
+     return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center animate-fade-in">
+            <div className="bg-rose-500/10 p-6 rounded-full mb-6 ring-1 ring-rose-500/50 shadow-[0_0_30px_rgba(244,63,94,0.2)]">
+               <Activity className="w-12 h-12 text-rose-500" />
+            </div>
+            <h1 className="text-4xl font-black text-white mb-4 tracking-tight uppercase">Market Bubble Scope</h1>
+            <p className="text-slate-400 max-w-lg mx-auto mb-10 text-lg">
+               Scan global indices and assets for irrational exuberance, valuation divergence, and systemic risk anomalies.
+            </p>
+            <button 
+               onClick={onScan} 
+               disabled={isLoading}
+               className="group relative flex items-center gap-3 px-8 py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-black uppercase tracking-widest transition-all shadow-[0_10px_40px_-10px_rgba(244,63,94,0.5)] hover:shadow-[0_20px_60px_-15px_rgba(244,63,94,0.6)] hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+               {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-current" />}
+               {isLoading ? 'Scanning Markets...' : 'Initiate Global Scan'}
+            </button>
+        </div>
+     );
+  }
+
   const { markdownReport, structuredData } = data;
   const isStreaming = !structuredData;
 

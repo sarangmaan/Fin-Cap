@@ -1,3 +1,4 @@
+
 export interface ChartDataPoint {
   label: string;
   value: number;
@@ -5,42 +6,53 @@ export interface ChartDataPoint {
   rsi?: number;
 }
 
+export interface TechnicalAnalysisData {
+  priceData: { date: string; price: number; ma50: number }[];
+  rsiData: { date: string; value: number }[];
+  currentRsi: number;
+  currentMa: number;
+  signal: 'Buy' | 'Sell' | 'Neutral';
+}
+
 export interface BubbleAudit {
-  valuationVerdict: 'Undervalued' | 'Fair Value' | 'Overvalued' | 'Bubble Territory';
-  score: number; // 0-100 (Bubble intensity)
-  fundamentalDivergence: string; // Explanation of price vs value
-  peerComparison: string; // Context vs sector
+  riskStatus: 'Safe' | 'Elevated' | 'Critical';
+  valuationVerdict: 'Undervalued' | 'Fair Value' | 'Overvalued' | 'Bubble';
+  score: number;
+  fundamentals: string; // "Price is slightly ahead of recent earnings..."
+  peerContext: string; // "P/E ratio is a slight premium..."
   speculativeActivity: 'Low' | 'Moderate' | 'High' | 'Extreme';
+  burstTrigger: string; // "Fed rate hike...", "Earnings miss..."
+  liquidityStatus: 'Abundant' | 'Neutral' | 'Drying Up' | 'Illiquid';
 }
 
 export interface WhistleblowerData {
-  integrityScore: number; // 0-100 (100 = Clean, 0 = High Fraud Risk)
+  integrityScore: number;
   verdict: 'Clean' | 'Suspicious' | 'High Risk' | 'Manipulation Detected';
-  forensicVerdict: string; // Detailed sentence summary of the forensic audit
-  anomalies: string[]; // List of specific contradictions found
-  insiderActivity: string; // "CEO dumping shares" vs "Net buying"
-  accountingFlags: string; // "Revenue up, Cash flow down" etc.
-  networkAnalysis?: string; // Hidden connections or opaque subsidiary structures
-  regulatoryFriction?: string; // Ongoing investigations or compliance failures
-  sentimentDivergence?: string; // Difference between retail hype and institutional actions
+  forensicVerdict: string;
+  anomalies: string[];
+  insiderActivity: string;
+  accountingFlags: string;
+  insiderDetails?: string[]; // Added for specific trade details
 }
 
 export interface StructuredAnalysisData {
-  riskScore: number; // 0-100
-  riskLevel: 'Low' | 'Moderate' | 'High' | 'Critical';
-  bubbleProbability: number; // 0-100
+  riskScore: number;
+  bubbleProbability: number;
   marketSentiment: 'Bullish' | 'Bearish' | 'Neutral' | 'Euphoric';
   keyMetrics: { label: string; value: string }[];
-  trendData: ChartDataPoint[];
-  technicalAnalysis?: string; // Detailed momentum commentary
-  warningSignals?: string[];
+  trendData: ChartDataPoint[]; // Kept for legacy compatibility if needed
+  
+  // New detailed fields
+  technicalAnalysis?: TechnicalAnalysisData;
+  bubbleAudit?: BubbleAudit;
+  warningSignals?: string[]; // Added missing field
+  
   swot?: {
     strengths: string[];
     weaknesses: string[];
     opportunities: string[];
     threats: string[];
   };
-  bubbleAudit?: BubbleAudit;
   whistleblower?: WhistleblowerData;
   topBubbleAssets?: {
     name: string;

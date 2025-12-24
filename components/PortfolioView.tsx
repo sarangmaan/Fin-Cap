@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PortfolioItem } from '../types';
 import { stocks } from '../data/stocks';
-import { Plus, Trash2, PieChart, TrendingUp, RefreshCcw, Wallet, BrainCircuit } from 'lucide-react';
+import { Plus, Trash2, PieChart, TrendingUp, RefreshCcw, Wallet, BrainCircuit, Minus, X, Check, ArrowRightLeft } from 'lucide-react';
 import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip, Legend } from 'recharts';
 
 interface PortfolioViewProps {
@@ -16,6 +16,11 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ items, onUpdate, onAnalyz
   const [isAdding, setIsAdding] = useState(false);
   const [newItem, setNewItem] = useState<{ symbol: string; qty: string; cost: string }>({ symbol: '', qty: '', cost: '' });
   const [suggestions, setSuggestions] = useState<typeof stocks>([]);
+
+  // Transaction Modal State
+  const [transaction, setTransaction] = useState<{ type: 'buy' | 'sell', item: PortfolioItem } | null>(null);
+  const [transQty, setTransQty] = useState('');
+  const [transPrice, setTransPrice] = useState('');
 
   // Derived Stats
   const totalValue = items.reduce((acc, item) => acc + (item.currentPrice * item.quantity), 0);
@@ -53,6 +58,56 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ items, onUpdate, onAnalyz
     onUpdate(items.filter(i => i.id !== id));
   };
 
+  const initiateTransaction = (type: 'buy' | 'sell', item: PortfolioItem) => {
+      setTransaction({ type, item });
+      setTransQty('');
+      // Default to current market price for convenience
+      setTransPrice(item.currentPrice.toFixed(2));
+  };
+
+  const executeTransaction = () => {
+      if (!transaction) return;
+      
+      const qty = parseFloat(transQty);
+      const price = parseFloat(transPrice);
+
+      if (isNaN(qty) || qty <= 0) return;
+      if (isNaN(price) || price < 0) return;
+
+      const { item, type } = transaction;
+      let newItems = [...items];
+      const index = newItems.findIndex(i => i.id === item.id);
+      
+      if (index === -1) return;
+
+      if (type === 'buy') {
+          // Weighted Average Cost Logic
+          const currentTotalCost = newItems[index].quantity * newItems[index].buyPrice;
+          const newTransactionCost = qty * price;
+          const newTotalQty = newItems[index].quantity + qty;
+          const newAvgCost = (currentTotalCost + newTransactionCost) / newTotalQty;
+
+          newItems[index].quantity = newTotalQty;
+          newItems[index].buyPrice = newAvgCost;
+          // Optionally update current price to reflect market data entered? 
+          // Let's assume the user enters the execution price which might be the current market price.
+          newItems[index].currentPrice = price; 
+      } else {
+          // Sell Logic
+          if (qty >= newItems[index].quantity) {
+              // Sell all
+              newItems = newItems.filter(i => i.id !== item.id);
+          } else {
+              newItems[index].quantity -= qty;
+              // Update current price to reflect last transaction price
+              newItems[index].currentPrice = price;
+          }
+      }
+
+      onUpdate(newItems);
+      setTransaction(null);
+  };
+
   const refreshPrices = () => {
     // Simulates a price update for demo purposes
     const updated = items.map(item => ({
@@ -68,7 +123,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ items, onUpdate, onAnalyz
   }));
 
   return (
-    <div className="pb-20 animate-fade-in">
+    <div className="pb-20 animate-fade-in relative">
        {/* Header */}
        <div className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-white/5 pb-6">
           <div>
@@ -172,7 +227,7 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ items, onUpdate, onAnalyz
                 </div>
              )}
 
-             <div className="glass-card rounded-2xl overflow-hidden">
+             <div className="glass-card rounded-2xl overflow-hidden min-h-[300px]">
                 <table className="w-full text-left text-sm">
                    <thead className="bg-slate-900/60 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
                       <tr>
@@ -196,10 +251,10 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ items, onUpdate, onAnalyz
                                   <div className="font-bold text-white font-mono">{item.symbol}</div>
                                   <div className="text-xs text-slate-500 truncate max-w-[150px] font-medium">{item.name}</div>
                                </td>
-                               <td className="px-6 py-4 text-right text-slate-300 font-mono">{item.quantity}</td>
+                               <td className="px-6 py-4 text-right text-slate-300 font-mono">{item.quantity.toLocaleString()}</td>
                                <td className="px-6 py-4 text-right text-slate-300 font-mono">${item.buyPrice.toFixed(2)}</td>
                                <td className="px-6 py-4 text-right text-sky-300 font-mono font-bold">${item.currentPrice.toFixed(2)}</td>
-                               <td className="px-6 py-4 text-right font-bold text-white font-mono">${val.toLocaleString()}</td>
+                               <td className="px-6 py-4 text-right font-bold text-white font-mono">${val.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                                <td className="px-6 py-4 text-right">
                                   <div className={`font-bold font-mono ${pl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                      {pl >= 0 ? '+' : ''}{pl.toFixed(2)}
@@ -209,9 +264,29 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ items, onUpdate, onAnalyz
                                   </div>
                                </td>
                                <td className="px-6 py-4 text-right">
-                                  <button onClick={() => removeAsset(item.id)} className="text-slate-600 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100">
-                                     <Trash2 className="w-4 h-4" />
-                                  </button>
+                                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button 
+                                        onClick={() => initiateTransaction('buy', item)} 
+                                        className="p-1.5 rounded-md text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors"
+                                        title="Buy More"
+                                      >
+                                          <Plus className="w-4 h-4" />
+                                      </button>
+                                      <button 
+                                        onClick={() => initiateTransaction('sell', item)}
+                                        className="p-1.5 rounded-md text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 transition-colors"
+                                        title="Sell"
+                                      >
+                                          <Minus className="w-4 h-4" />
+                                      </button>
+                                      <button 
+                                        onClick={() => removeAsset(item.id)} 
+                                        className="p-1.5 rounded-md text-slate-500 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"
+                                        title="Remove Asset"
+                                      >
+                                          <Trash2 className="w-4 h-4" />
+                                      </button>
+                                  </div>
                                </td>
                             </tr>
                          );
@@ -261,6 +336,80 @@ const PortfolioView: React.FC<PortfolioViewProps> = ({ items, onUpdate, onAnalyz
              )}
           </div>
        </div>
+
+       {/* Transaction Modal */}
+       {transaction && (
+           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+               <div className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl shadow-2xl relative overflow-hidden">
+                   <div className={`p-6 border-b border-white/5 flex items-center justify-between ${transaction.type === 'buy' ? 'bg-emerald-950/30' : 'bg-amber-950/30'}`}>
+                       <div className="flex items-center gap-3">
+                           <div className={`p-2 rounded-lg ${transaction.type === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                               {transaction.type === 'buy' ? <Plus className="w-5 h-5" /> : <Minus className="w-5 h-5" />}
+                           </div>
+                           <div>
+                               <h3 className="text-lg font-black text-white uppercase tracking-tight">
+                                   {transaction.type === 'buy' ? 'Buy Position' : 'Sell Position'}
+                               </h3>
+                               <p className="text-xs text-slate-400 font-mono">{transaction.item.symbol} • {transaction.item.name}</p>
+                           </div>
+                       </div>
+                       <button onClick={() => setTransaction(null)} className="text-slate-500 hover:text-white transition-colors">
+                           <X className="w-5 h-5" />
+                       </button>
+                   </div>
+                   
+                   <div className="p-6 space-y-5">
+                       <div>
+                           <label className="text-[10px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Transaction Quantity</label>
+                           <input 
+                             type="number" 
+                             value={transQty} 
+                             onChange={e => setTransQty(e.target.value)}
+                             className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:border-sky-500 focus:outline-none font-mono text-lg"
+                             placeholder="0"
+                             autoFocus
+                           />
+                           {transaction.type === 'sell' && (
+                               <div className="text-right mt-1 text-[10px] text-slate-500 font-mono">
+                                   Max: {transaction.item.quantity}
+                               </div>
+                           )}
+                       </div>
+
+                       <div>
+                           <label className="text-[10px] text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Execution Price ($)</label>
+                           <input 
+                             type="number" 
+                             value={transPrice} 
+                             onChange={e => setTransPrice(e.target.value)}
+                             className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:border-sky-500 focus:outline-none font-mono text-lg"
+                             placeholder="0.00"
+                           />
+                       </div>
+
+                       <div className="bg-slate-800/50 rounded-lg p-4 flex justify-between items-center border border-white/5">
+                           <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">Total Value</span>
+                           <span className="text-xl font-black text-white font-mono">
+                               ${((parseFloat(transQty) || 0) * (parseFloat(transPrice) || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                           </span>
+                       </div>
+
+                       <button 
+                           onClick={executeTransaction}
+                           disabled={!transQty || !transPrice}
+                           className={`w-full py-4 rounded-xl font-bold uppercase tracking-wider text-sm transition-all shadow-lg flex items-center justify-center gap-2 ${
+                               transaction.type === 'buy' 
+                               ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20' 
+                               : 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-900/20'
+                           } disabled:opacity-50 disabled:cursor-not-allowed`}
+                       >
+                           {transaction.type === 'buy' ? <Plus className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
+                           Confirm Transaction
+                       </button>
+                   </div>
+               </div>
+           </div>
+       )}
     </div>
   );
 };

@@ -5,7 +5,7 @@ import PortfolioView from './components/PortfolioView';
 import BubbleScopeView from './components/BubbleScopeView';
 import SearchBar from './components/SearchBar';
 import Logo from './components/Logo';
-import { BarChart3, AlertTriangle, DollarSign, PieChart, Activity } from 'lucide-react';
+import { BarChart3, AlertTriangle, DollarSign, PieChart, Activity, Loader2, ScanLine } from 'lucide-react';
 import { analyzeMarket, analyzePortfolio, analyzeBubbles } from './services/geminiService';
 
 const App: React.FC = () => {
@@ -26,6 +26,22 @@ const App: React.FC = () => {
     localStorage.setItem('fincap_portfolio', JSON.stringify(portfolioItems));
   }, [portfolioItems]);
 
+  // Safety Timeout: Force stop loading if it gets stuck for more than 45 seconds
+  useEffect(() => {
+    let safetyTimer: NodeJS.Timeout;
+    if (loading) {
+        safetyTimer = setTimeout(() => {
+            if (loading) {
+                console.warn("Analysis timed out via watchdog.");
+                setLoading(false);
+                setError("The analysis took too long. Please check your connection or API key and try again.");
+                setView(ViewState.ERROR);
+            }
+        }, 45000); // 45 second hard limit
+    }
+    return () => clearTimeout(safetyTimer);
+  }, [loading]);
+
   const handleUpdatePortfolio = (items: PortfolioItem[]) => {
     setPortfolioItems(items);
   };
@@ -37,25 +53,33 @@ const App: React.FC = () => {
     setError(null);
     setAnalyzedQuery(searchQuery);
     
-    // Start with the Loading View (Spinners)
+    // Show ANALYZING view first (Scanning UI)
+    setResult({ markdownReport: "", isEstimated: false });
     setView(ViewState.ANALYZING);
-    setResult(null);
 
     try {
       await analyzeMarket(searchQuery, (partialResult) => {
           setResult((prev) => {
-             if (partialResult.markdownReport && partialResult.markdownReport.length > 5) {
-                 setView(ViewState.REPORT);
-             }
-             return {
+             const newData = {
                 markdownReport: partialResult.markdownReport || prev?.markdownReport || "",
                 structuredData: partialResult.structuredData || prev?.structuredData,
                 groundingChunks: partialResult.groundingChunks || prev?.groundingChunks,
                 isEstimated: partialResult.isEstimated
              };
+             
+             // TRANSITION LOGIC:
+             // Switch to Report View only after we have received some text data.
+             if (newData.markdownReport.length > 20) {
+                 setView((current) => current === ViewState.ANALYZING ? ViewState.REPORT : current);
+             }
+
+             return newData;
           });
       });
       
+      // Force transition to report view when promise resolves, regardless of content length
+      setView(ViewState.REPORT);
+
     } catch (err: any) {
       console.error("Search Analysis Failed:", err);
       let msg = err.message || 'Something went wrong.';
@@ -83,22 +107,27 @@ const App: React.FC = () => {
     setLoading(true);
     setError(null);
     setAnalyzedQuery("Portfolio Risk Audit");
+    
+    setResult({ markdownReport: "", isEstimated: false });
     setView(ViewState.ANALYZING);
-    setResult(null);
+
     try {
       await analyzePortfolio(portfolioItems, (partialResult) => {
           setResult((prev) => {
-             if (partialResult.markdownReport && partialResult.markdownReport.length > 5) {
-                 setView(ViewState.REPORT);
-             }
-             return {
+             const newData = {
                 markdownReport: partialResult.markdownReport || prev?.markdownReport || "",
                 structuredData: partialResult.structuredData || prev?.structuredData,
                 groundingChunks: partialResult.groundingChunks || prev?.groundingChunks,
                 isEstimated: partialResult.isEstimated
              };
+             
+             if (newData.markdownReport.length > 20) {
+                 setView((current) => current === ViewState.ANALYZING ? ViewState.REPORT : current);
+             }
+             return newData;
           });
       });
+      setView(ViewState.REPORT);
     } catch (err: any) {
       setError(err.message || 'Portfolio analysis failed.');
       setView(ViewState.ERROR);
@@ -111,8 +140,9 @@ const App: React.FC = () => {
       setLoading(true);
       setError(null);
       setAnalyzedQuery("Global Market Bubble Scope");
-      setView(ViewState.BUBBLE_SCOPE);
       setResult({ markdownReport: "Initiating Global Market Scan...", isEstimated: false });
+      setView(ViewState.BUBBLE_SCOPE);
+      
       try {
           await analyzeBubbles((partialResult) => {
               setResult((prev) => ({
@@ -137,9 +167,16 @@ const App: React.FC = () => {
   };
 
   const handleNavClick = (viewName: string) => {
-      if (viewName === 'Portfolio') setView(ViewState.PORTFOLIO);
-      else if (viewName === 'Markets') setView(ViewState.DASHBOARD);
-      else if (viewName === 'Bubble Scope') handleBubbleScope();
+      if (viewName === 'Portfolio') {
+        setView(ViewState.PORTFOLIO);
+      }
+      else if (viewName === 'Markets') {
+        setView(ViewState.DASHBOARD);
+      }
+      else if (viewName === 'Bubble Scope') {
+         setResult(null);
+         setView(ViewState.BUBBLE_SCOPE);
+      }
   };
 
   return (
@@ -165,7 +202,7 @@ const App: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-1 md:gap-2 text-sm font-semibold text-slate-400">
-              <button onClick={() => handleNavClick('Markets')} className={`px-4 py-2 rounded-lg transition-all cursor-pointer ${view === ViewState.DASHBOARD || view === ViewState.REPORT ? 'text-white bg-slate-800/50 shadow-inner' : 'hover:text-white hover:bg-white/5'}`}>Markets</button>
+              <button onClick={() => handleNavClick('Markets')} className={`px-4 py-2 rounded-lg transition-all cursor-pointer ${view === ViewState.DASHBOARD || view === ViewState.REPORT || view === ViewState.ANALYZING ? 'text-white bg-slate-800/50 shadow-inner' : 'hover:text-white hover:bg-white/5'}`}>Markets</button>
               <button onClick={() => handleNavClick('Portfolio')} className={`px-4 py-2 rounded-lg transition-all cursor-pointer ${view === ViewState.PORTFOLIO ? 'text-white bg-slate-800/50 shadow-inner' : 'hover:text-white hover:bg-white/5'}`}>Portfolio</button>
               <button onClick={() => handleNavClick('Bubble Scope')} className={`px-4 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-2 ${view === ViewState.BUBBLE_SCOPE ? 'bg-rose-950/20 text-rose-400 border border-rose-500/20 shadow-[0_0_15px_rgba(244,63,94,0.1)]' : 'hover:text-rose-400 hover:bg-rose-950/10'}`}>
                  <Activity className="w-3.5 h-3.5" /> Bubble Scope
@@ -187,7 +224,7 @@ const App: React.FC = () => {
                 </p>
              </div>
              
-             <div className={`max-w-3xl mx-auto ${view === ViewState.REPORT || view === ViewState.PORTFOLIO || view === ViewState.BUBBLE_SCOPE ? 'scale-95 opacity-0 h-0 overflow-visible pointer-events-none' : 'overflow-visible'}`}>
+             <div className={`max-w-3xl mx-auto ${view === ViewState.REPORT || view === ViewState.PORTFOLIO || view === ViewState.BUBBLE_SCOPE || view === ViewState.ANALYZING ? 'scale-95 opacity-0 h-0 overflow-visible pointer-events-none' : 'overflow-visible'}`}>
                <SearchBar 
                   query={query} 
                   setQuery={setQuery} 
@@ -205,20 +242,28 @@ const App: React.FC = () => {
           </div>
 
           {/* Views */}
+          
           {view === ViewState.ANALYZING && (
-            <div className="flex flex-col items-center justify-center py-20">
-               <div className="relative w-20 h-20 mb-8">
-                  <div className="absolute inset-0 border-t-2 border-cyan-500 rounded-full animate-spin"></div>
-                  <div className="absolute inset-2 border-r-2 border-blue-600 rounded-full animate-spin-reverse"></div>
-                  <div className="absolute inset-4 border-b-2 border-purple-600 rounded-full animate-spin"></div>
-               </div>
-               <h2 className="text-xl font-bold text-white mb-2 tracking-wide uppercase">Processing Data</h2>
-               <p className="text-slate-500 font-mono text-xs uppercase tracking-widest">Running Forensic Algorithms...</p>
-            </div>
+              <div className="flex flex-col items-center justify-center min-h-[50vh] animate-in fade-in zoom-in-95 duration-500">
+                  <div className="relative mb-8">
+                     <div className="absolute inset-0 bg-sky-500 blur-2xl opacity-20 animate-pulse"></div>
+                     <div className="relative z-10 bg-slate-900 rounded-full p-6 ring-1 ring-white/10 shadow-2xl">
+                         <Loader2 className="w-12 h-12 text-sky-500 animate-spin" />
+                     </div>
+                     <div className="absolute -inset-4 border border-dashed border-sky-500/20 rounded-full animate-[spin_10s_linear_infinite]"></div>
+                  </div>
+                  <h2 className="text-3xl font-black text-white mb-3 uppercase tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+                    Initiating Scan
+                  </h2>
+                  <div className="flex items-center gap-2 text-slate-400 font-mono text-sm bg-slate-900/50 px-4 py-2 rounded-lg border border-white/5">
+                      <ScanLine className="w-4 h-4 animate-pulse text-sky-400" />
+                      <span>Analyzing market data for <span className="text-white font-bold">"{analyzedQuery}"</span>...</span>
+                  </div>
+              </div>
           )}
-
+          
           {view === ViewState.ERROR && (
-            <div className="max-w-2xl mx-auto text-center py-20 glass-card rounded-2xl border-rose-900/30">
+            <div className="max-w-2xl mx-auto text-center py-20 glass-card rounded-2xl border-rose-900/30 animate-in fade-in">
               <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                  <AlertTriangle className="w-8 h-8 text-rose-500" />
               </div>
@@ -241,7 +286,7 @@ const App: React.FC = () => {
             />
           )}
 
-          {view === ViewState.BUBBLE_SCOPE && result && (
+          {view === ViewState.BUBBLE_SCOPE && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
                    <div className="flex items-center justify-between mb-8">
                      <button 
@@ -258,7 +303,7 @@ const App: React.FC = () => {
                          <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">Live Risk Monitor</span>
                      </div>
                   </div>
-                  <BubbleScopeView data={result} />
+                  <BubbleScopeView data={result} onScan={handleBubbleScope} isLoading={loading} />
               </div>
           )}
 
@@ -280,7 +325,7 @@ const App: React.FC = () => {
           )}
 
           {view === ViewState.DASHBOARD && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16 animate-in fade-in slide-in-from-bottom-5">
                <div className="glass-card p-8 rounded-2xl group cursor-pointer" onClick={() => performAnalysis('Deep Fundamental Scan of major tech stocks')}>
                   <div className="w-14 h-14 bg-sky-500/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-sky-500/20 transition-colors border border-sky-500/20">
                      <BarChart3 className="w-7 h-7 text-sky-400" />
@@ -295,7 +340,7 @@ const App: React.FC = () => {
                   <h3 className="font-extrabold text-xl text-white mb-3">Fair Value Audit</h3>
                   <p className="text-sm text-slate-400 leading-relaxed">AI-driven intrinsic valuation models to detect over-hyped assets and hidden gems.</p>
                </div>
-               <div className="glass-card p-8 rounded-2xl group cursor-pointer" onClick={() => handleBubbleScope()}>
+               <div className="glass-card p-8 rounded-2xl group cursor-pointer" onClick={() => { setView(ViewState.BUBBLE_SCOPE); setResult(null); }}>
                   <div className="w-14 h-14 bg-rose-500/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-rose-500/20 transition-colors border border-rose-500/20">
                      <PieChart className="w-7 h-7 text-rose-400" />
                   </div>

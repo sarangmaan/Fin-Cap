@@ -56,14 +56,41 @@ const SearchBar: React.FC<SearchBarProps> = ({ query, setQuery, onSearch, loadin
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setQuery(value);
+    
     if (value.length > 0) {
       const lowerQuery = value.toLowerCase();
+      
       const filtered = stocks
         .filter(stock => 
           stock.symbol.toLowerCase().includes(lowerQuery) || 
           stock.name.toLowerCase().includes(lowerQuery)
         )
-        .sort((a, b) => a.symbol.localeCompare(b.symbol));
+        .sort((a, b) => {
+            const aSymbol = a.symbol.toLowerCase();
+            const bSymbol = b.symbol.toLowerCase();
+            const aName = a.name.toLowerCase();
+            const bName = b.name.toLowerCase();
+
+            // Priority 1: Exact symbol match
+            if (aSymbol === lowerQuery && bSymbol !== lowerQuery) return -1;
+            if (bSymbol === lowerQuery && aSymbol !== lowerQuery) return 1;
+
+            // Priority 2: Symbol starts with query
+            const aStartsSymbol = aSymbol.startsWith(lowerQuery);
+            const bStartsSymbol = bSymbol.startsWith(lowerQuery);
+            if (aStartsSymbol && !bStartsSymbol) return -1;
+            if (!aStartsSymbol && bStartsSymbol) return 1;
+
+            // Priority 3: Name starts with query
+            const aStartsName = aName.startsWith(lowerQuery);
+            const bStartsName = bName.startsWith(lowerQuery);
+            if (aStartsName && !bStartsName) return -1;
+            if (!aStartsName && bStartsName) return 1;
+
+            // Priority 4: Alphabetical
+            return a.symbol.localeCompare(b.symbol);
+        });
+        
       setSuggestions(filtered.slice(0, 8));
       setShowSuggestions(true);
     } else {

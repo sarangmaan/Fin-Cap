@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
       allowedHosts: true, // Allow the Render URL to access the server
       proxy: {
         '/api': {
-          target: 'http://localhost:3000',
+          target: 'http://127.0.0.1:3000', // Changed from localhost to 127.0.0.1 to ensure IPv4 binding
           changeOrigin: true,
           secure: false,
         },

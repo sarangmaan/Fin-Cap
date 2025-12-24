@@ -6,64 +6,74 @@ interface RiskGaugeProps {
   type?: 'risk' | 'bubble';
 }
 
-const RiskGauge: React.FC<RiskGaugeProps> = ({ score, label, type = 'risk' }) => {
-  // Calculate color based on score
-  const getColor = (val: number) => {
-    if (val < 30) return 'text-emerald-400 border-emerald-500 shadow-emerald-900/50';
-    if (val < 70) return 'text-yellow-400 border-yellow-500 shadow-yellow-900/50';
-    return 'text-rose-500 border-rose-500 shadow-rose-900/50';
-  };
-
-  const getBgColor = (val: number) => {
-      if (val < 30) return 'bg-emerald-500';
-      if (val < 70) return 'bg-yellow-500';
-      return 'bg-rose-500';
-  }
-
-  const themeColor = getColor(score);
-  const barColor = getBgColor(score);
-  
-  // Circumference for SVG circle
-  const radius = 50;
+const RiskGauge: React.FC<RiskGaugeProps> = ({ score, label }) => {
+  // SVG Configuration
+  // Increased radius (35->45) and stroke (8->10) for better visual ratio
+  const radius = 45;
+  const strokeWidth = 10;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (score / 100) * circumference;
+  const offset = circumference - ((score / 100) * circumference);
+  
+  // Color Logic (Matching Screenshot: 45/35 is Yellow/Amber 'Caution')
+  const getColor = (s: number) => {
+    if (s < 35) return 'text-emerald-400'; // Stable
+    if (s < 70) return 'text-amber-400';   // Caution
+    return 'text-rose-500';                // Critical
+  };
+  
+  const getBgColor = (s: number) => {
+    if (s < 35) return 'bg-emerald-400';
+    if (s < 70) return 'bg-amber-400';
+    return 'bg-rose-500';
+  };
+  
+  const colorClass = getColor(score);
+  const bgColorClass = getBgColor(score);
+  
+  const statusText = score < 35 ? 'Stable' : score < 70 ? 'Caution' : 'Critical';
 
   return (
-    <div className="glass-card p-6 rounded-xl flex flex-col items-center justify-center">
-      <div className="relative w-32 h-32 mb-4">
-        {/* Background Circle */}
-        <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-          <circle
-            cx="60"
-            cy="60"
-            r={radius}
-            fill="none"
-            stroke="#1e293b"
-            strokeWidth="10"
-          />
-          {/* Progress Circle */}
-          <circle
-            cx="60"
-            cy="60"
-            r={radius}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="10"
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            strokeLinecap="round"
-            className={`${themeColor.split(' ')[0]} transition-all duration-1000 ease-out`}
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center flex-col">
-          <span className={`text-4xl font-black ${themeColor.split(' ')[0]}`}>{score}</span>
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">/ 100</span>
-        </div>
-      </div>
-      <h3 className="text-sm font-extrabold text-white uppercase tracking-wider text-center">{label}</h3>
-      <div className={`mt-3 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${barColor} text-slate-900`}>
-        {score < 30 ? 'SAFE' : score < 70 ? 'CAUTION' : 'DANGER'}
-      </div>
+    <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 hover:border-slate-600 rounded-2xl p-6 flex flex-col items-center justify-center relative overflow-hidden h-64 shadow-[0_20px_50px_rgba(0,0,0,0.5)] hover:scale-[1.02] transition-all duration-300 ease-out">
+       
+       {/* Gauge Circle - Increased container size w-32 -> w-40 */}
+       <div className="relative w-40 h-40 flex items-center justify-center z-10 mb-3">
+          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 128 128">
+             {/* Background Circle */}
+             <circle
+               cx="64"
+               cy="64"
+               r={radius}
+               stroke="#1f2937"
+               strokeWidth={strokeWidth}
+               fill="transparent"
+             />
+             {/* Progress Circle */}
+             <circle
+               cx="64"
+               cy="64"
+               r={radius}
+               stroke="currentColor"
+               strokeWidth={strokeWidth}
+               fill="transparent"
+               strokeDasharray={circumference}
+               strokeDashoffset={offset}
+               strokeLinecap="round"
+               className={`${colorClass} transition-all duration-1000 ease-out`}
+             />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+             <span className={`text-5xl font-black ${colorClass}`}>{score}</span>
+             <span className="text-xs text-slate-500 font-bold uppercase mt-1">/ 100</span>
+          </div>
+       </div>
+
+       {/* Label - Larger text */}
+       <h3 className="text-white text-xl font-bold mb-2 z-10">{label}</h3>
+
+       {/* Pill */}
+       <div className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-900 ${bgColorClass}`}>
+           {statusText}
+       </div>
     </div>
   );
 };
