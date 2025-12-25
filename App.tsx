@@ -26,7 +26,7 @@ const App: React.FC = () => {
     localStorage.setItem('fincap_portfolio', JSON.stringify(portfolioItems));
   }, [portfolioItems]);
 
-  // Safety Timeout: Force stop loading if it gets stuck for more than 45 seconds
+  // Safety Timeout: Increased to 300 seconds (5 mins) to prevent premature timeout
   useEffect(() => {
     let safetyTimer: ReturnType<typeof setTimeout>;
     if (loading) {
@@ -37,7 +37,7 @@ const App: React.FC = () => {
                 setError("The analysis took too long. Please check your connection or API key and try again.");
                 setView(ViewState.ERROR);
             }
-        }, 45000); // 45 second hard limit
+        }, 300000); // 5 minutes limit
     }
     return () => clearTimeout(safetyTimer);
   }, [loading]);

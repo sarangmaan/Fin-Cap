@@ -7,7 +7,6 @@ const parseGeminiResponse = (rawText: string, metadata: any[]): AnalysisResult =
   let markdownReport = rawText;
 
   // 1. Regex to find the JSON block inside ```json ... ``` or just ``` ... ```
-  // Added optional (?:json)? to handle cases where model omits language tag
   const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
 
   if (jsonMatch && jsonMatch[1]) {
@@ -42,7 +41,6 @@ const parseGeminiResponse = (rawText: string, metadata: any[]): AnalysisResult =
 };
 
 // Helper to call the backend API
-// CRITICAL FIX: Use window.location.origin to avoid connecting to localhost in production
 const callBackend = async (mode: string, payloadData: any) => {
     try {
         const BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
@@ -54,16 +52,21 @@ const callBackend = async (mode: string, payloadData: any) => {
             body: JSON.stringify({ mode, data: payloadData }),
         });
 
+        // 1. Check for standard network failures or 404/500 status codes
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            let errorMessage = errorData.error || `Server Error: ${response.status}`;
+            let errorMessage = `Server Error: ${response.status} ${response.statusText}`;
             
-            // Detect common "Model Not Found" error which indicates stale deployment or model misconfiguration
-            const errorString = JSON.stringify(errorData).toLowerCase();
-            if (errorString.includes('not found') || errorString.includes('404')) {
-                errorMessage = "Deployment Error: The configured AI model version was not found. Please redeploy the application.";
+            try {
+                // Try to parse JSON error message from backend
+                const errorData = await response.json();
+                if (errorData.error) {
+                    errorMessage = errorData.error;
+                }
+            } catch (e) {
+                // If it fails to parse JSON, stick with status code
+                console.warn("Could not parse backend error JSON", e);
             }
-
+            
             throw new Error(errorMessage);
         }
 
@@ -75,7 +78,6 @@ const callBackend = async (mode: string, payloadData: any) => {
 };
 
 export const analyzeMarket = async (query: string, onUpdate?: (data: AnalysisResult) => void): Promise<AnalysisResult> => {
-  // Pass the query string directly to the backend 'market' mode
   const { text, metadata } = await callBackend('market', query);
   
   const result = parseGeminiResponse(text, metadata);
@@ -84,7 +86,6 @@ export const analyzeMarket = async (query: string, onUpdate?: (data: AnalysisRes
 };
 
 export const analyzePortfolio = async (portfolio: PortfolioItem[], onUpdate?: (data: AnalysisResult) => void): Promise<AnalysisResult> => {
-  // Pass the portfolio array stringified to the backend 'portfolio' mode
   const data = JSON.stringify(portfolio);
   const { text, metadata } = await callBackend('portfolio', data);
   
@@ -94,7 +95,6 @@ export const analyzePortfolio = async (portfolio: PortfolioItem[], onUpdate?: (d
 };
 
 export const analyzeBubbles = async (onUpdate?: (data: AnalysisResult) => void): Promise<AnalysisResult> => {
-  // Bubbles mode doesn't need specific data input
   const { text, metadata } = await callBackend('bubbles', {});
   
   const result = parseGeminiResponse(text, metadata);
@@ -108,7 +108,6 @@ export const chatWithGemini = async (
   context: { symbol: string, riskScore: number, sentiment: string }
 ): Promise<string> => {
     try {
-        // Chat mode on backend expects a JSON string containing history, message, and context
         const payload = JSON.stringify({ history, message, context });
         
         const BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
@@ -120,7 +119,6 @@ export const chatWithGemini = async (
 
         if (!response.ok) return "Connection lost. The Reality Check is offline.";
         
-        // Chat endpoint returns plain text directly
         return await response.text();
 
     } catch (error) {
