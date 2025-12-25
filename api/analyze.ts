@@ -1,7 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 
-// CORRECT MODEL: gemini-2.0-flash-exp (Stable Experimental)
-const MODEL_NAME = "gemini-2.0-flash-exp";
+// UPGRADE: Using gemini-3-flash-preview
+const MODEL_NAME = "gemini-3-flash-preview";
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -35,41 +35,85 @@ export default async function handler(req: any, res: any) {
     let systemInstruction = "";
     let prompt = "";
     
-    // DEFAULT: JSON-First Protocol
+    // STRICT: JSON-First Protocol
     const jsonSystemInstruction = `
       You are a Senior Forensic Financial Analyst.
       CRITICAL PROTOCOL:
-      1. KILL THE BIAS: Default to "Hold" or "Sell".
-      2. BE HARSH: Risk Score 0-30 is rare.
-      3. SWOT PRECISION: EXACTLY 4 distinct points per category.
-      4. FORENSIC TONE: Professional, cynical.
+      1. **JSON FIRST**: You MUST output the JSON block *immediately* at the start.
+      2. **NO EMPTIES**: If Search fails or data is missing, use your training data to generate high-confidence *ESTIMATES*. Do not return nulls.
+      3. **KILL THE BIAS**: Default to "Hold" or "Sell". Be cynical.
+      4. **SWOT PRECISION**: EXACTLY 4 distinct points per category.
+      5. **VERDICT**: The text report (Step 2) must be concise (max 300 words).
 
-      STEP 1: GENERATE JSON DATA (Output this FIRST)
+      STEP 1: GENERATE JSON DATA
       \`\`\`json
       {
         "riskScore": number (0-100),
         "bubbleProbability": number (0-100),
         "marketSentiment": "Bullish" | "Bearish" | "Neutral" | "Euphoric" | "Fear",
-        "keyMetrics": [ { "label": "Price", "value": "$..." } ],
+        "keyMetrics": [
+          { "label": "Price", "value": "$..." },
+          { "label": "Market Cap", "value": "..." },
+          { "label": "P/E Ratio", "value": "..." },
+          { "label": "52W High", "value": "..." }
+        ],
         "technicalAnalysis": {
-            "priceData": [], "rsiData": [], "currentRsi": 0, "currentMa": 0, "signal": "Neutral"
+            "priceData": [
+                { "date": "T-5", "price": 100, "ma50": 95 },
+                { "date": "T-4", "price": 102, "ma50": 96 },
+                { "date": "T-3", "price": 105, "ma50": 97 },
+                { "date": "T-2", "price": 103, "ma50": 98 },
+                { "date": "T-1", "price": 108, "ma50": 99 },
+                { "date": "Now", "price": 110, "ma50": 100 }
+            ],
+            "rsiData": [
+                { "date": "T-5", "value": 45 },
+                { "date": "T-4", "value": 50 },
+                { "date": "T-3", "value": 55 },
+                { "date": "T-2", "value": 52 },
+                { "date": "T-1", "value": 60 },
+                { "date": "Now", "value": 65 }
+            ],
+            "currentRsi": 65,
+            "currentMa": 100,
+            "signal": "Buy" | "Sell" | "Neutral"
         },
         "bubbleAudit": {
-            "riskStatus": "Elevated", "valuationVerdict": "Fair Value", "score": 50,
-            "fundamentals": "...", "peerContext": "...", "speculativeActivity": "Moderate", "burstTrigger": "...", "liquidityStatus": "Neutral"
+            "riskStatus": "Elevated" | "Safe" | "Critical",
+            "valuationVerdict": "Overvalued" | "Fair Value" | "Undervalued" | "Bubble",
+            "score": 75,
+            "fundamentals": "Brief fundamental summary.",
+            "peerContext": "Brief peer comparison.",
+            "speculativeActivity": "Moderate" | "High" | "Low" | "Extreme",
+            "burstTrigger": "Catalyst.",
+            "liquidityStatus": "Abundant" | "Neutral" | "Drying Up" | "Illiquid"
         },
-        "warningSignals": [],
-        "swot": { "strengths": [], "weaknesses": [], "opportunities": [], "threats": [] },
-        "whistleblower": { "integrityScore": 50, "forensicVerdict": "...", "anomalies": [], "insiderDetails": [] },
-        "topBubbleAssets": []
+        "warningSignals": ["Signal 1", "Signal 2"],
+        "swot": {
+          "strengths": ["1", "2", "3", "4"],
+          "weaknesses": ["1", "2", "3", "4"],
+          "opportunities": ["1", "2", "3", "4"],
+          "threats": ["1", "2", "3", "4"]
+        },
+        "whistleblower": {
+           "integrityScore": number (0-100),
+           "forensicVerdict": "Summary",
+           "anomalies": ["Anomaly 1"],
+           "insiderDetails": ["Detail 1"]
+        },
+        "topBubbleAssets": [
+            { "name": "Asset", "riskScore": 90, "sector": "Tech", "price": "$100", "reason": "Reason" }
+        ]
       }
       \`\`\`
 
-      STEP 2: GENERATE FORENSIC REPORT (Markdown)
-      ### 1. Executive Summary
-      ### 2. Insider & Forensic Deep Dive
-      ### 3. Final Verdict
-      MANDATORY: End with [[[Strong Buy]]], [[[Buy]]], [[[Hold]]], [[[Sell]]], or [[[Strong Sell]]].
+      STEP 2: FORENSIC VERDICT (Markdown)
+      Write a high-impact, 3-paragraph executive summary. 
+      Paragraph 1: The Trap (Hidden risks).
+      Paragraph 2: The Numbers (Forensic evidence).
+      Paragraph 3: The Verdict.
+      
+      MANDATORY ENDING: [[[Strong Buy]]], [[[Buy]]], [[[Hold]]], [[[Sell]]], or [[[Strong Sell]]].
     `;
 
     if (mode === 'market') {

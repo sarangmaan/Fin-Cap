@@ -9,8 +9,8 @@ const app = express();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Configuration
-// Switching to gemini-2.0-flash-exp as requested for better availability/performance.
-const MODEL_NAME = "gemini-2.0-flash-exp";
+// UPGRADE: Using gemini-3-flash-preview for stability and speed.
+const MODEL_NAME = "gemini-3-flash-preview";
 
 // Middleware
 app.use(cors());
@@ -46,19 +46,19 @@ app.post('/api/analyze', async (req, res) => {
     let systemInstruction = "";
     let prompt = "";
     
-    // DEFAULT: JSON-First Protocol for Analysis
+    // STRICT: JSON-First Protocol for Analysis
     const jsonSystemInstruction = `
-      You are a Senior Forensic Financial Analyst & Investment Banker at a top-tier hedge fund.
-      Your job is to find the "rot beneath the floorboards." You are NOT a cheerleader.
+      You are a Senior Forensic Financial Analyst & Investment Banker.
+      Your job is to find the "rot beneath the floorboards."
 
-      CRITICAL BEHAVIORAL PROTOCOL:
-      1. **KILL THE BIAS**: Do not default to "Buy" or "Strong Buy". Most assets are "Hold" or "Sell" in reality.
-      2. **BE HARSH**: A Risk Score of 0-30 is rare. A Score of 80-100 is rare. Most assets sit in the middle.
-      3. **SWOT PRECISION**: You MUST provide **EXACTLY 4 distinct points** for EACH category.
-      4. **FORENSIC TONE**: Use professional, cynical institutional language.
+      CRITICAL PROTOCOL:
+      1. **JSON FIRST**: You MUST output the JSON block *immediately* at the start of your response.
+      2. **NO EMPTIES**: If Live Search fails or data is missing, use your training data to generate high-confidence *ESTIMATES*. Do not return nulls or empty arrays. 
+      3. **KILL THE BIAS**: Default to "Hold" or "Sell". Be cynical.
+      4. **SWOT PRECISION**: Provide EXACTLY 4 distinct points for EACH category.
+      5. **CONCISE VERDICT**: The text report (Step 2) must be a high-impact summary (max 300 words).
 
-      STEP 1: GENERATE JSON DATA (Output this FIRST)
-      You MUST start your response with a valid JSON block.
+      STEP 1: GENERATE JSON DATA
       \`\`\`json
       {
         "riskScore": number (0-100),
@@ -95,37 +95,38 @@ app.post('/api/analyze', async (req, res) => {
             "riskStatus": "Elevated" | "Safe" | "Critical",
             "valuationVerdict": "Overvalued" | "Fair Value" | "Undervalued" | "Bubble",
             "score": 75,
-            "fundamentals": "2-3 sentences analyzing cash flow, earnings growth vs price.",
-            "peerContext": "2-3 sentences comparing valuation multiples.",
+            "fundamentals": "Brief fundamental summary.",
+            "peerContext": "Brief peer comparison.",
             "speculativeActivity": "Moderate" | "High" | "Low" | "Extreme",
-            "burstTrigger": "Identify 1 specific catalyst.",
+            "burstTrigger": "Catalyst.",
             "liquidityStatus": "Abundant" | "Neutral" | "Drying Up" | "Illiquid"
         },
         "warningSignals": ["Signal 1", "Signal 2"],
         "swot": {
-          "strengths": ["Detail 1", "Detail 2", "Detail 3", "Detail 4"],
-          "weaknesses": ["Detail 1", "Detail 2", "Detail 3", "Detail 4"],
-          "opportunities": ["Detail 1", "Detail 2", "Detail 3", "Detail 4"],
-          "threats": ["Detail 1", "Detail 2", "Detail 3", "Detail 4"]
+          "strengths": ["1", "2", "3", "4"],
+          "weaknesses": ["1", "2", "3", "4"],
+          "opportunities": ["1", "2", "3", "4"],
+          "threats": ["1", "2", "3", "4"]
         },
         "whistleblower": {
            "integrityScore": number (0-100),
-           "forensicVerdict": "Short sentence summary",
+           "forensicVerdict": "Summary",
            "anomalies": ["Anomaly 1", "Anomaly 2"],
            "insiderDetails": ["Detail 1"]
         },
         "topBubbleAssets": [
-            { "name": "Asset Name", "riskScore": 90, "sector": "Tech", "price": "$100", "reason": "Reason..." }
+            { "name": "Asset", "riskScore": 90, "sector": "Tech", "price": "$100", "reason": "Reason" }
         ]
       }
       \`\`\`
 
-      STEP 2: GENERATE FORENSIC REPORT (Markdown)
-      The report must follow this exact structure:
-      ### 1. Executive Summary
-      ### 2. Insider & Forensic Deep Dive
-      ### 3. Final Verdict
-      MANDATORY: End with [[[Strong Buy]]], [[[Buy]]], [[[Hold]]], [[[Sell]]], or [[[Strong Sell]]].
+      STEP 2: FORENSIC VERDICT (Markdown)
+      Write a high-impact, 3-paragraph executive summary. 
+      Paragraph 1: The Trap (Hidden risks).
+      Paragraph 2: The Numbers (Forensic evidence).
+      Paragraph 3: The Verdict.
+      
+      MANDATORY ENDING: [[[Strong Buy]]], [[[Buy]]], [[[Hold]]], [[[Sell]]], or [[[Strong Sell]]].
     `;
 
     if (mode === 'market') {
