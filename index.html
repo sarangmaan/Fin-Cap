@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fin Cap - AI Market Analysis</title>
     <link rel="icon" href="data:,">
+    
+    <!-- Suppress Tailwind Warning -->
     <script>
-      // Aggressively suppress the specific Tailwind CDN warning
       (function() {
         var oldWarn = console.warn;
         console.warn = function(...args) {
@@ -17,52 +18,34 @@
         };
       })();
     </script>
+    
+    <!-- UI Styling -->
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
       
       body {
         font-family: 'Inter', sans-serif;
-        background-color: #0f172a; /* Slate 900 */
-        color: #e2e8f0; /* Slate 200 */
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
+        background-color: #0f172a;
+        color: #e2e8f0;
       }
       
       .font-mono {
         font-family: 'JetBrains Mono', monospace;
       }
 
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #0f172a; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #334155; 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #475569; 
-      }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: #0f172a; }
+      ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-      /* --- PREMIUM FINTECH TERMINAL STYLES --- */
-
-      /* Film Grain Overlay */
       .bg-grain {
-        position: fixed;
-        inset: 0;
-        z-index: 0;
-        opacity: 0.035;
-        pointer-events: none;
+        position: fixed; inset: 0; z-index: 0; opacity: 0.035; pointer-events: none;
         background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
       }
 
-      /* Glassmorphic Card */
       .glass-card {
         background: rgba(30, 41, 59, 0.7);
         backdrop-filter: blur(12px) saturate(180%);
@@ -78,53 +61,25 @@
         box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.6);
       }
 
-      /* Institutional Typography */
-      h1, h2, h3, h4, h5, h6 {
-        letter-spacing: -0.02em;
-      }
-
-      /* PDF Helpers */
-      .pdf-only { display: none !important; }
-      .pdf-page-break { page-break-before: always !important; }
-      .html2pdf__container { font-family: 'Inter', sans-serif !important; }
+      .recharts-responsive-container { min-width: 0; }
       
       @media print {
         .no-print { display: none !important; }
-        .pdf-only { display: block !important; }
         body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       }
-      
-      .recharts-responsive-container { min-width: 0; }
-      
-      @keyframes pulse-slow {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.7; }
-      }
-      .animate-pulse-slow {
-        animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-      }
     </style>
-<script type="importmap">
+  <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
-    "recharts": "https://esm.sh/recharts@^3.5.1",
-    "vite": "https://esm.sh/vite@^7.2.7",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "vite": "https://esm.sh/vite@^7.3.0",
     "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "cors": "https://esm.sh/cors@^2.8.5",
-    "express": "https://esm.sh/express@^5.2.1",
-    "dotenv": "https://esm.sh/dotenv@^17.2.3",
-    "path": "https://esm.sh/path@^0.12.7",
-    "url": "https://esm.sh/url@^0.11.4",
-    "node-fetch": "https://esm.sh/node-fetch@^3.3.2",
-    "react-dom": "https://esm.sh/react-dom@^19.2.3",
-    "html2canvas": "https://esm.sh/html2canvas@^1.4.1",
-    "jspdf": "https://esm.sh/jspdf@^3.0.4",
-    "dotenv/": "https://esm.sh/dotenv@^17.2.3/"
+    "react-dom": "https://esm.sh/react-dom@^19.2.3"
   }
 }
 </script>

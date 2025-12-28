@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 
-// UPGRADE: Using gemini-3-flash-preview
+// CORRECT MODEL ID: gemini-3-flash-preview
 const MODEL_NAME = "gemini-3-flash-preview";
 
 export default async function handler(req: any, res: any) {
@@ -22,7 +22,7 @@ export default async function handler(req: any, res: any) {
 
   try {
     const { mode, data } = req.body;
-    const apiKey = process.env.API_KEY;
+    const apiKey = process.env.API_KEY || "AIzaSyChK0Eq_JFfIrVPrskNVQq8Gaa_YpkoV6k";
 
     if (!apiKey) {
       console.error("API_KEY missing");
@@ -118,7 +118,7 @@ export default async function handler(req: any, res: any) {
 
     if (mode === 'market') {
         systemInstruction = jsonSystemInstruction;
-        prompt = `Perform a forensic deep-dive analysis for: "${data}".`;
+        prompt = `Perform a forensic deep-dive analysis for: "${data}". If search fails, ESTIMATE values.`;
     } else if (mode === 'portfolio') {
         systemInstruction = jsonSystemInstruction;
         prompt = `Audit this portfolio for risk and exposure: ${data}.`;
@@ -140,7 +140,7 @@ export default async function handler(req: any, res: any) {
         systemInstruction: systemInstruction,
         tools: [{ googleSearch: {} }],
         maxOutputTokens: 8192,
-        temperature: 0.3
+        temperature: 0.2
       }
     });
 

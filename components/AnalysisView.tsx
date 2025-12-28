@@ -14,7 +14,7 @@ const SwotCard = ({ title, items, type }: { title: string, items: string[], type
     threat: { color: 'text-rose-400', border: 'border-rose-500/30', hoverBorder: 'hover:border-rose-500/60', icon: AlertOctagon },
   }[type];
   return (
-    <div className={`bg-slate-900/60 backdrop-blur-xl border ${config.border} ${config.hoverBorder} p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] hover:scale-[1.02] transition-all duration-300 ease-out break-inside-avoid`}>
+    <div className={`bg-slate-900/60 backdrop-blur-xl border ${config.border} ${config.hoverBorder} p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] hover:scale-[1.02] transition-all duration-300 ease-out break-inside-avoid page-break-avoid`}>
       <div className="flex items-center gap-3 mb-4">
         <config.icon className={`w-5 h-5 ${config.color}`} />
         <h4 className={`font-black text-sm uppercase tracking-widest ${config.color}`}>{title}</h4>
@@ -58,18 +58,19 @@ const AnalysisView: React.FC<{ data: AnalysisResult, title: string }> = ({ data,
   const handleExport = () => {
     const element = document.getElementById('analysis-report');
     const opt = {
-      margin: [10, 10, 10, 10], // Reduced margin for better fit
+      margin: [5, 5, 5, 5], 
       filename: `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_fincap_audit.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { 
         scale: 2, 
         useCORS: true, 
         backgroundColor: '#0f172a',
-        windowWidth: 1400, // Force Desktop Width to maintain Grid Layout in PDF
+        windowWidth: 1600, // Ensure we capture the full desktop grid layout
         scrollY: 0
       },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      // Landscape orientation fits the 3-column dashboard layout much better on A4 paper
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+      pagebreak: { mode: ['css', 'legacy'] }
     };
     // @ts-ignore
     if (window.html2pdf) {
@@ -81,10 +82,9 @@ const AnalysisView: React.FC<{ data: AnalysisResult, title: string }> = ({ data,
   };
 
   return (
-    <div className="animate-fade-in pb-20" id="analysis-report">
-      <div className="flex flex-col items-center justify-center mb-10 border-b-2 border-white pb-8 gap-8 pt-8">
+    <div className="animate-fade-in pb-20 w-full" id="analysis-report">
+      <div className="flex flex-col items-center justify-center mb-10 border-b-2 border-white pb-8 gap-8 pt-8 break-inside-avoid">
         <div className="text-center">
-          {/* Reduced font size by approx 2 steps: 6xl->4xl, 8xl->6xl */}
           <h1 className="text-4xl md:text-6xl font-black text-white uppercase tracking-tighter">{title}</h1>
           <p className="text-sky-400 font-mono text-lg uppercase tracking-widest mt-4">Real-time Analysis Report</p>
         </div>
@@ -170,19 +170,18 @@ const AnalysisView: React.FC<{ data: AnalysisResult, title: string }> = ({ data,
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Forensic Verdict (Left 2/3) */}
-          <div className="lg:col-span-2 bg-slate-900/80 border border-slate-800 rounded-3xl p-10 h-fit">
+          <div className="lg:col-span-2 bg-slate-900/80 border border-slate-800 rounded-3xl p-10 h-fit break-inside-avoid">
             <div className="flex items-center gap-3 mb-8 border-b border-white/5 pb-6">
               <ShieldCheck className="w-8 h-8 text-sky-400" />
               <h2 className="text-3xl font-black text-white uppercase tracking-tight">Forensic Verdict</h2>
             </div>
-            {/* Increased text size to prose-lg/xl as requested */}
             <div className="prose prose-invert max-w-none prose-lg">
               <MarkdownRenderer content={markdownReport} />
             </div>
           </div>
 
           {/* Right Column (1/3) */}
-          <div className="space-y-6">
+          <div className="space-y-6 break-inside-avoid">
               
               {/* Momentum Scan Box (Technical Analysis) */}
               <div className="break-inside-avoid bg-slate-900/80 border border-slate-800 rounded-3xl p-6 relative overflow-hidden">
@@ -338,7 +337,6 @@ const AnalysisView: React.FC<{ data: AnalysisResult, title: string }> = ({ data,
                              <h4 className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                                 <Flame className="w-3 h-3 text-rose-500" /> Burst Trigger
                              </h4>
-                             {/* Ensure text is white as requested */}
                              <p className="text-xs text-white leading-relaxed font-bold">
                                  {structuredData.bubbleAudit.burstTrigger || 'None detected at this stage.'}
                              </p>
@@ -354,7 +352,6 @@ const AnalysisView: React.FC<{ data: AnalysisResult, title: string }> = ({ data,
       {/* Whistleblower Modal */}
       {showWhistleblower && structuredData?.whistleblower && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" data-html2canvas-ignore>
-           {/* Adjusted max-h to 80vh to ensure it fits better on screens */}
            <div className="bg-slate-900 border border-rose-500 w-full max-w-2xl rounded-2xl shadow-2xl relative flex flex-col max-h-[80vh]">
               <button onClick={() => setShowWhistleblower(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white z-10"><X className="w-6 h-6" /></button>
               
@@ -368,7 +365,6 @@ const AnalysisView: React.FC<{ data: AnalysisResult, title: string }> = ({ data,
                  </div>
               </div>
 
-              {/* Added overflow-y-auto to this container so only the popup scrolls */}
               <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
                  <div className="flex items-center justify-between bg-slate-950 p-4 rounded-xl border border-slate-800">
                     <span className="text-slate-400 font-bold uppercase text-sm">Integrity Score</span>
@@ -398,7 +394,6 @@ const AnalysisView: React.FC<{ data: AnalysisResult, title: string }> = ({ data,
                     </ul>
                  </div>
                  
-                 {/* New Insider Details Section */}
                  {structuredData.whistleblower.insiderDetails && structuredData.whistleblower.insiderDetails.length > 0 && (
                      <div>
                         <h4 className="text-white font-bold uppercase tracking-widest text-xs mb-3 flex items-center gap-2">
@@ -432,7 +427,7 @@ const AnalysisView: React.FC<{ data: AnalysisResult, title: string }> = ({ data,
          }} 
       />
 
-      {/* Footer Disclaimer Replacement */}
+      {/* Footer Disclaimer */}
       <footer className="mt-20 py-8 border-t border-slate-800/50 text-center break-inside-avoid">
          <div className="max-w-4xl mx-auto px-4">
              <p className="text-[10px] text-slate-500 uppercase tracking-widest font-mono mb-2">
