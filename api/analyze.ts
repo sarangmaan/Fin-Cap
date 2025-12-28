@@ -22,7 +22,7 @@ export default async function handler(req: any, res: any) {
 
   try {
     const { mode, data } = req.body;
-    const apiKey = process.env.API_KEY || "AIzaSyChK0Eq_JFfIrVPrskNVQq8Gaa_YpkoV6k";
+    const apiKey = process.env.API_KEY;
 
     if (!apiKey) {
       console.error("API_KEY missing");
